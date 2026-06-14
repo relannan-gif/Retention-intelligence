@@ -342,7 +342,7 @@ class ScoringMatrix(Flowable):
         cells = [
             ["Save Immediately",      "Senior Retention Review",  "Automated Retention"],
             ["Proactive Nurture",      "Standard Nurture",         "Light Touch"],
-            ["VIP Expansion",          "Growth Program",           "Monitor"],
+            ["High Value Growth",       "Growth Program",           "Monitor"],
         ]
         col_labels = ["High Value", "Medium Value", "Low Value"]
         row_labels  = ["High Risk", "Medium Risk", "Low Risk"]
@@ -418,21 +418,21 @@ class ScoreFormulaBox(Flowable):
              "         Deposit Inactivity · Complaints · Equity Erosion · Equity Trend"),
             ("Commercial Value Score", "#F0B429",
              "Σ weight × band_score(component) → min-max 0–100\n"
-             "Factors: Lifetime Deposits · Net Deposits · Current Equity\n"
-             "         Volume · Redeposits · Tenure · VIP Status (×9)"),
+             "6 Factors: Lifetime Deposits · Net Deposits · Current Equity\n"
+             "           Volume · Redeposits · Tenure  (no account type used)"),
             ("Profitability Score",    "#10B981",
              "A-Book: spread + commission + swap\n"
-             "B-Book: captured_losses + commission + swap + spread\n"
-             "M-Book: (0.6 × captured_losses) + spread + commission + swap → min-max 0–100"),
+             "B-Book: captured_losses + commission + swap  (no spread)\n"
+             "M-Book: (0.6 × captured_losses) + commission + swap  (no spread)"),
             ("Client Health Score",    "#3B82F6",
              "(100 − risk_score) × 0.50\n"
              "+ commercial_value_score × 0.30\n"
              "+ profitability_score × 0.20"),
             ("Priority Score",         "#8B5CF6",
-             "risk_score × 0.30\n"
+             "risk_score × 0.35\n"
              "+ commercial_value_score × 0.25\n"
-             "+ profitability_score × 0.30\n"
-             "+ reactivation_score × 0.15"),
+             "+ profitability_score × 0.35\n"
+             "+ upside_potential_score × 0.05"),
             ("Reactivation Score",     "#F59E0B",
              "Non-linear login window (peaks at 105 days)\n"
              "+ lifetime_deposits + redeposits + vol_90d + tenure"),
@@ -469,7 +469,7 @@ class ScoreFormulaBox(Flowable):
 
 
 class ActionDecisionTree(Flowable):
-    """11-rule action decision tree diagram."""
+    """9-rule action decision tree diagram."""
     def __init__(self, width=CONTENT_W, height=320):
         super().__init__()
         self.width = width
@@ -477,22 +477,20 @@ class ActionDecisionTree(Flowable):
 
     def draw(self):
         rules = [
-            (1, "VIP + High Risk + High Value", "URGENT: VIP Retention — Escalate", "#EF4444", "Management Review"),
-            (2, "High Risk + High Value + High Profitability", "Immediate Retention Call", "#EF4444", "Retention Team"),
-            (3, "≥2 Complaints + High Risk", "Resolve Complaints + Retention Review", "#F97316", "Retention Team"),
-            (4, "Large Withdrawal + High Risk", "Retention Call: Withdrawal Alert", "#F97316", "Account Manager"),
-            (5, "High Risk (any)", "Retention Follow-Up", "#F59E0B", "Account Manager"),
-            (6, "VIP + Low Risk + High Value", "VIP Expansion Offer", "#F0B429", "VIP Team"),
-            (7, "VIP Upside ≥65 + Not VIP", "VIP Upsell Opportunity", "#10B981", "Sales Team"),
-            (8, "Reactivation ≥65 + Dormant", "Reactivation Campaign", "#3B82F6", "Sales Team"),
-            (9, "Volume Drop >50% + Risk ≥35", "Re-engagement: Trading Incentive", "#8B5CF6", "Account Manager"),
-            (10, "≥1 Complaint", "Complaint Resolution", "#94A3B8", "Account Manager"),
-            (11, "Default", "Monitor Only", "#64748B", "Account Manager"),
+            (1, "High Risk + High Value + High Profitability", "Immediate Retention Call", "#EF4444", "Management Review"),
+            (2, "≥2 Complaints + High Risk", "Resolve Complaints + Retention Review", "#F97316", "Retention Team"),
+            (3, "Large Withdrawal + High Risk", "Retention Call: Withdrawal Alert", "#F97316", "Account Manager"),
+            (4, "High Risk (any)", "Retention Follow-Up", "#F59E0B", "Retention Team"),
+            (5, "Upside Potential ≥65 + Value ≥70%HV", "Growth Opportunity: Upgrade Offer", "#F0B429", "Sales Team"),
+            (6, "Reactivation ≥65 + Dormant", "Reactivation Campaign", "#3B82F6", "Sales Team"),
+            (7, "Volume Drop >50% + Risk ≥35", "Re-engagement: Trading Incentive", "#8B5CF6", "Account Manager"),
+            (8, "≥1 Complaint", "Complaint Resolution", "#94A3B8", "Account Manager"),
+            (9, "Default", "Monitor Only", "#64748B", "Account Manager"),
         ]
 
         self.canv.setFont("Helvetica-Bold", 9)
         self.canv.setFillColor(C_GOLD)
-        self.canv.drawString(0, self.height - 12, "Action Routing — 11-Rule Decision Tree (First Match Wins)")
+        self.canv.drawString(0, self.height - 12, "Action Routing — 9-Rule Decision Tree (First Match Wins)")
 
         row_h = (self.height - 22) / len(rules)
         col_x = [0, self.width * 0.05, self.width * 0.42, self.width * 0.72]
@@ -877,7 +875,7 @@ def executive_summary_page():
         ["Reduce undetected churn", "High-risk clients identified 30–60 days before withdrawal"],
         ["Increase retention call conversion", "AMs call the right clients; target >40% success rate"],
         ["Prioritise revenue-generating clients", "Profitability-first action queue drives ROI on retention effort"],
-        ["Identify VIP upgrade candidates", "VIP Upside Score surfaces non-VIP clients ready for upgrade"],
+        ["Identify growth opportunity clients", "Upside Potential Score surfaces clients with expansion potential"],
         ["Reactivate dormant accounts", "Reactivation Score identifies the best win-back candidates"],
         ["Validate model predictive accuracy", "Churn prediction target: >75% AUC; withdrawal: >80% AUC"],
     ]
@@ -948,7 +946,7 @@ def platform_architecture_page():
         ["value_weights", "dict", "See §4.2", "7 commercial value factor weights"],
         ["prof_weights", "dict", "See §4.3", "9 profitability factor weights"],
         ["react_weights", "dict", "See §4.4", "5 reactivation factor weights"],
-        ["vip_weights", "dict", "See §4.5", "5 VIP upside factor weights"],
+        ["upside_weights", "dict", "See §4.5", "5 upside potential factor weights"],
         ["scoring_rules", "dict", "From JSON", "Business rules bands (loaded from config/scoring_rules.json)"],
         ["scored_df", "DataFrame", "Generated", "Full scored client table (cached per session)"],
         ["data_source", "str", "\"sample\"", "Active data source key"],
@@ -962,8 +960,8 @@ def platform_architecture_page():
     elems.append(Paragraph(
         "The first three scores (Retention Risk, Commercial Value, Profitability) use the "
         "Business Rules Engine — configurable band scoring defined in config/scoring_rules.json. "
-        "The remaining three (Reactivation, VIP Upside, Health) use direct weighted formulas "
-        "hard-coded in utils/scoring.py.",
+        "The remaining three (Reactivation, Upside Potential, Health) use direct weighted formulas "
+        "in utils/scoring.py.",
         ST["Body"]
     ))
     scoring_rows = [
@@ -972,7 +970,7 @@ def platform_architecture_page():
         ["Commercial Value Score", "Band-based (rules_engine.py)", "✅ Yes — via Settings", "utils/rules_engine.py:score_commercial_value()"],
         ["Profitability Score", "Band-based (rules_engine.py)", "✅ Yes — via Settings", "utils/rules_engine.py:score_profitability()"],
         ["Reactivation Score", "Direct weighted formula", "Weights only", "utils/scoring.py:score_reactivation()"],
-        ["VIP Upside Score", "Direct weighted formula", "Weights only", "utils/scoring.py:score_vip_upside()"],
+        ["Upside Potential Score", "Direct weighted formula", "Weights only", "utils/scoring.py:compute_upside_potential()"],
         ["Client Health Score", "Composite formula", "❌ Hard-coded", "utils/scoring.py:compute_health_score()"],
         ["Priority Score", "Composite formula", "❌ Hard-coded", "utils/scoring.py:compute_priority_score()"],
     ]
@@ -996,7 +994,7 @@ def data_requirements_page():
         ["account_manager", "Assigned account manager", "string", "✅", "Sarah Johnson"],
         ["ib_name", "Introducing Broker name", "string", "Opt", "Gulf Traders IB"],
         ["book_type", "Trading book assignment", "string", "✅", "A-Book / B-Book / M-Book"],
-        ["vip_status", "Whether client is VIP", "boolean", "Opt", "True / False"],
+        ["account_type", "Account classification (info only)", "string", "Opt", "Classic / Prime / Islamic"],
         ["client_tenure_days", "Days since account opened", "integer", "Opt", "847"],
     ]
     elems.append(make_table(id_rows,
@@ -1051,7 +1049,7 @@ def data_requirements_page():
         ["Last deposit/withdrawal date", "Real-time or daily snapshot", "Triggers withdrawal alert rule"],
         ["Trading volume", "30-day rolling", "Used directly in scoring"],
         ["Prior period volume", "Days 31–60 (previous 30-day window)", "Basis for volume drop signal"],
-        ["Historical volume reference", "90-day reference point", "Used in VIP Upside Score"],
+        ["Historical volume reference", "90-day reference point", "Used in Upside Potential Score"],
         ["Current equity", "Daily close balance", "Core to risk and value scoring"],
         ["Equity reference", "30-day-ago balance", "Equity trend signal in risk score"],
         ["Revenue (spread, commission, swap)", "Monthly aggregate", "Fed into profitability score"],
@@ -1105,19 +1103,19 @@ def scoring_engine_page():
     rr_rows = [
         ["Signal", "Input", "Band Points (Low → High)", "Default Weight"],
         ["Withdrawal Pressure", "withdrawal_30d / current_equity",
-         "&lt;10%: 10pts | 10–30%: 50pts | ≥30%: 90pts", "8"],
+         "&lt;10%: 10pts | 10–30%: 50pts | ≥30%: 90pts", "12 (highest)"],
         ["Volume Drop", "(prev_vol − curr_vol) / prev_vol",
-         "≤0%: 5pts | 0–30%: 30pts | 30–60%: 65pts | &gt;60%: 90pts", "7"],
+         "≤0%: 5pts | 0–30%: 30pts | 30–60%: 65pts | &gt;60%: 90pts", "10"],
         ["Login Inactivity", "login_days_ago",
          "&lt;7d: 5pts | 7–30d: 25pts | 30–90d: 65pts | &gt;90d: 90pts", "6"],
+        ["Equity Trend 30d", "(equity_30d_ago − equity) / equity_30d_ago",
+         "≤0%: 0pts | 0–15%: 30pts | 15–30%: 65pts | &gt;30%: 90pts", "6"],
         ["Deposit Inactivity", "last_deposit_days_ago",
          "&lt;30d: 5pts | 30–90d: 30pts | 90–180d: 60pts | &gt;180d: 90pts", "5"],
         ["Complaints", "complaints_30d + open_tickets",
-         "0: 0pts | 1: 50pts | ≥2: 90pts", "9 (highest)"],
+         "0: 0pts | 1: 50pts | ≥2: 90pts", "5"],
         ["Equity Erosion", "1 − (equity / net_deposits)",
-         "≤0%: 0pts | 0–15%: 30pts | 15–30%: 65pts | &gt;30%: 90pts", "5"],
-        ["Equity Trend 30d", "(equity_30d_ago − equity) / equity_30d_ago",
-         "≤0%: 0pts | 0–15%: 30pts | 15–30%: 65pts | &gt;30%: 90pts", "6"],
+         "≤0%: 0pts | 0–20%: 25pts | 20–50%: 60pts | &gt;50%: 90pts", "5"],
     ]
     elems.append(make_table(rr_rows,
         col_widths=[CONTENT_W*0.18, CONTENT_W*0.24, CONTENT_W*0.45, CONTENT_W*0.13],
@@ -1141,13 +1139,12 @@ def scoring_engine_page():
     ))
     cv_rows = [
         ["Component", "Band Thresholds", "Default Weight"],
-        ["Lifetime Deposits", "&lt;$1K: 10 | $1K–$10K: 35 | $10K–$50K: 60 | $50K–$200K: 85 | &gt;$200K: 100", "8"],
-        ["Net Deposits", "&lt;$0: 0 | $0–$1K: 15 | $1K–$10K: 40 | $10K–$50K: 70 | &gt;$50K: 100", "7"],
-        ["Current Equity", "&lt;$500: 5 | $500–$5K: 30 | $5K–$25K: 60 | $25K–$100K: 85 | &gt;$100K: 100", "8"],
+        ["Lifetime Deposits", "&lt;$1K: 10 | $1K–$10K: 35 | $10K–$50K: 60 | $50K–$200K: 85 | &gt;$200K: 100", "10 (joint highest)"],
+        ["Current Equity", "&lt;$500: 5 | $500–$5K: 30 | $5K–$25K: 60 | $25K–$100K: 85 | &gt;$100K: 100", "10 (joint highest)"],
+        ["Net Deposits", "&lt;$0: 0 | $0–$1K: 15 | $1K–$10K: 40 | $10K–$50K: 70 | &gt;$50K: 100", "8"],
         ["Trading Volume (30d)", "&lt;$1K: 5 | $1K–$10K: 25 | $10K–$100K: 55 | $100K–$500K: 80 | &gt;$500K: 100", "6"],
-        ["Redeposit Count", "0: 0 | 1–2: 25 | 3–7: 55 | 8–15: 80 | &gt;15: 100", "5"],
-        ["Client Tenure", "&lt;90d: 10 | 90–365d: 35 | 365–730d: 65 | &gt;730d: 100", "4"],
-        ["VIP Status", "VIP = 100pts | Non-VIP = 0pts", "9 (highest)"],
+        ["Redeposit Count", "0: 0 | 1–2: 25 | 3–7: 55 | 8–15: 80 | &gt;15: 100", "6"],
+        ["Client Tenure", "&lt;90d: 10 | 90–365d: 35 | 365–730d: 65 | &gt;730d: 100", "5"],
     ]
     elems.append(make_table(cv_rows,
         col_widths=[CONTENT_W*0.22, CONTENT_W*0.62, CONTENT_W*0.16], small=True))
@@ -1164,9 +1161,9 @@ def scoring_engine_page():
         ["Book Type", "Formula", "Band Thresholds"],
         ["A-Book", "spread + commission + swap",
          "&lt;$50: 10 | $50–$200: 35 | $200–$500: 60 | $500–$2K: 85 | &gt;$2K: 100"],
-        ["B-Book", "captured_losses + commission + swap + spread",
+        ["B-Book", "captured_losses + commission + swap  (no spread)",
          "&lt;$0: 0 | $0–$100: 20 | $100–$500: 45 | $500–$2K: 70 | $2K–$5K: 90 | &gt;$5K: 100"],
-        ["M-Book", "(0.6 × captured_losses) + spread + commission + swap",
+        ["M-Book", "(0.6 × captured_losses) + commission + swap  (no spread)",
          "&lt;$0: 0 | $0–$75: 20 | $75–$300: 45 | $300–$1K: 70 | &gt;$1K: 100"],
     ]
     elems.append(make_table(prof_rows,
@@ -1205,12 +1202,12 @@ def scoring_engine_page():
         ST["Body"]
     ))
     elems.append(Paragraph(
-        "priority_score = risk_score × 0.30 + value_score × 0.25 + profitability_score × 0.30 + reactivation_score × 0.15",
+        "priority_score = risk_score × 0.35 + value_score × 0.25 + profitability_score × 0.35 + upside_potential_score × 0.05",
         ST["Code"]
     ))
     elems.append(Paragraph(
-        "Design rationale: Risk and profitability are equally weighted at 30% each — a client that is "
-        "both at risk AND profitable generates the highest urgency. Value contributes 25%, reactivation 15%.",
+        "Design rationale: Risk and profitability are equally weighted at 35% each — a client that is "
+        "both at risk AND profitable generates the highest urgency. Value contributes 25%, upside potential 5%.",
         ST["Body"]
     ))
     return elems
@@ -1233,9 +1230,9 @@ def segmentation_action_page():
     elems.append(ScoringMatrix(width=CONTENT_W, height=200))
     elems.append(Spacer(1, 10))
 
-    elems.append(Paragraph("11-Rule Action Decision Tree", ST["H2"]))
+    elems.append(Paragraph("9-Rule Action Decision Tree", ST["H2"]))
     elems.append(Paragraph(
-        "Source: utils/scoring.py:assign_actions(). First-match wins. "
+        "Source: utils/scoring.py:assign_recommended_action(). First-match wins. "
         "All threshold values (high_risk, high_value, high_profitability, large_withdrawal_pct) "
         "are configurable in Settings.",
         ST["Body"]
@@ -1247,10 +1244,9 @@ def segmentation_action_page():
     elems.append(Paragraph("Recommended Owner Routing", ST["H2"]))
     own_rows = [
         ["Condition", "Assigned Owner Team"],
-        ["URGENT VIP Retention action", "Management Review"],
-        ["VIP client (any risk level)", "VIP Team"],
-        ["Immediate Retention Call", "Retention Team"],
-        ["Reactivation Campaign or Re-engagement", "Sales Team"],
+        ["Immediate Retention Call (critical priority)", "Management Review"],
+        ["Complaint Resolution + Retention Review / Follow-Up", "Retention Team"],
+        ["Growth Opportunity / Reactivation / Re-engagement", "Sales Team"],
         ["All other actions", "Account Manager"],
     ]
     elems.append(make_table(own_rows, col_widths=[CONTENT_W*0.60, CONTENT_W*0.40]))
@@ -1383,8 +1379,8 @@ def dashboard_and_pages_section():
     elems.append(Paragraph("7.2 Client Detail Panel", ST["H2"]))
     elems.append(Paragraph(
         "Below the table, a client selector shows: 6 score tiles (Risk, Value, Profitability, "
-        "Reactivation, VIP Upside, Health) · Segment / Action / Owner / Reason · "
-        "Financial summary (equity, deposits, PnL, account status, VIP) · "
+        "Reactivation, Upside Potential, Health) · Segment / Action / Owner / Reason · "
+        "Financial summary (equity, deposits, PnL, account status, tenure) · "
         "Activity summary (login, deposit, withdrawal timing, volume, complaints) · "
         "Score Contribution Analysis — two horizontal bar charts showing which factors drove "
         "the Risk score and Value score.",
@@ -1422,15 +1418,15 @@ def dashboard_and_pages_section():
         "Filter by own name under 'Filter by owner → Account Manager'.",
         "Work down the list in displayed order (profitability-first).",
         "For 'Immediate Retention Call' or 'Retention Follow-Up': review Client Detail page for score reasons, note the action reason text for talking points, log outcome in Model Validation.",
-        "Flag 'URGENT: VIP Retention' clients for same-day escalation to management.",
+        "Flag 'Immediate Retention Call' clients for same-day escalation to management.",
     ]
     for i, step in enumerate(steps):
         elems.append(Paragraph(f"{i+1}.  {step}", ST["Bullet"]))
     elems.append(Spacer(1, 6))
     elems.append(Paragraph(
         "Escalation path: Management Review → Head of Retention + Commercial Director. "
-        "VIP Team → Dedicated VIP relationship manager. "
-        "Retention Team → Retention specialists, not AMs.",
+        "Retention Team → Retention specialists, not AMs. "
+        "Sales Team → Growth and reactivation campaigns.",
         ST["Info"]
     ))
     return elems
@@ -1614,7 +1610,7 @@ def operating_manual_section():
         ["Health = Critical (0–19)", "High risk, low value, low profitability", "Automated retention or deprioritise"],
         ["Priority ≥ 65", "Critical priority label — top action urgency", "Escalate to team lead"],
         ["Reactivation ≥ 65", "Dormant client with high win-back probability", "Launch reactivation campaign"],
-        ["VIP Upside ≥ 65", "Non-VIP client with VIP financial profile", "Initiate VIP upgrade conversation"],
+        ["Upside Potential ≥ 65", "Client with strong growth indicators (equity, volume, loyalty)", "Initiate upgrade offer conversation"],
     ]
     elems.append(make_table(interp_rows,
         col_widths=[CONTENT_W*0.28, CONTENT_W*0.38, CONTENT_W*0.34]))
@@ -1651,8 +1647,8 @@ def appendices_section():
         ["country", "string", "CRM", "✅", "Display / filter only"],
         ["account_manager", "string", "CRM", "✅", "Action routing / workload"],
         ["book_type", "string", "CRM/Platform", "✅", "Profitability formula selector"],
-        ["vip_status", "boolean", "CRM", "Optional", "Value score ×9, VIP upside, action rules"],
-        ["client_tenure_days", "integer", "Derived", "Optional", "Value score + reactivation score"],
+        ["account_type", "string", "CRM", "Optional", "Informational only — not used in scoring"],
+        ["client_tenure_days", "integer", "Derived", "Optional", "Value score (weight 5) + upside potential score"],
         ["lifetime_deposits", "float", "CRM", "✅", "Value score component (weight 8)"],
         ["withdrawals_total", "float", "CRM", "Optional", "net_deposits derivation"],
         ["net_deposits", "float", "Derived", "Derived", "Value score + equity erosion risk signal"],
@@ -1663,13 +1659,13 @@ def appendices_section():
         ["withdrawal_amount_last_30d", "float", "Platform", "✅", "Risk score withdrawal pressure (weight 8)"],
         ["trading_volume_last_30d", "float", "Platform", "✅", "Risk score volume drop + value score"],
         ["trading_volume_previous_30d", "float", "Platform", "✅ for risk", "Volume drop risk signal (weight 7)"],
-        ["volume_90d_ago", "float", "Platform", "Optional", "VIP upside trend + reactivation score"],
-        ["spread_commission_revenue", "float", "Platform", "✅", "All three profitability book formulas"],
+        ["volume_90d_ago", "float", "Platform", "Optional", "Upside potential volume trend + reactivation score"],
+        ["spread_commission_revenue", "float", "Platform", "✅", "A-Book profitability only (fee-based)"],
         ["commission_revenue", "float", "Platform", "Optional", "All three profitability book formulas"],
         ["swap_revenue", "float", "Platform", "Optional", "All three profitability book formulas"],
         ["captured_client_losses", "float", "Platform", "B/M-Book only", "B-Book and M-Book profitability formulas"],
         ["net_company_pnl", "float", "Derived", "Derived", "Priority score, Action Center ranking"],
-        ["number_of_redeposits", "integer", "CRM/Platform", "Optional", "Value score (weight 5) + reactivation + VIP upside"],
+        ["number_of_redeposits", "integer", "CRM/Platform", "Optional", "Value score (weight 6) + reactivation + upside potential"],
         ["complaints_last_30d", "integer", "CRM", "✅", "Risk score (weight 9) — highest single weight"],
         ["open_tickets", "integer", "CRM", "Optional", "Added to complaints for risk signal"],
     ]
@@ -1688,10 +1684,10 @@ def appendices_section():
         ["Equity Trend 30d", "(equity_30d_ago − equity) / equity_30d_ago", "Negative = equity growing (treated as 0 risk)"],
         ["Net Deposits", "lifetime_deposits − withdrawals_total", "Can be negative"],
         ["A-Book Profitability", "spread + commission + swap", "Pure fee-based"],
-        ["B-Book Profitability", "captured_losses + commission + swap + spread", "Negative when client profitable"],
-        ["M-Book Profitability", "(0.6 × captured_losses) + spread + commission + swap", "Ratio configurable in Settings"],
+        ["B-Book Profitability", "captured_losses + commission + swap  (no spread)", "Negative when client profitable"],
+        ["M-Book Profitability", "(0.6 × captured_losses) + commission + swap  (no spread)", "Ratio configurable in Settings"],
         ["Health Score", "(100 − risk) × 0.50 + value × 0.30 + profit × 0.20", "Hard-coded weights"],
-        ["Priority Score", "risk × 0.30 + value × 0.25 + profit × 0.30 + react × 0.15", "Hard-coded weights"],
+        ["Priority Score", "risk × 0.35 + value × 0.25 + profit × 0.35 + upside × 0.05", "Hard-coded weights"],
         ["Annual Revenue (at risk)", "sum(spread + commission + swap where at risk) × 12", "Approximation based on monthly data"],
         ["Min-Max Normalisation", "(x − min) / (max − min) × 100", "Defaults to 50 if min = max"],
         ["Reactivation Login Curve", "Peaks at 105 days; non-linear curve defined in scoring.py", "Only meaningful for dormant clients"],
@@ -1714,7 +1710,7 @@ def appendices_section():
         ["country", "country", "None"],
         ["account_manager", "account_manager", "None"],
         ["book_type", "book_type", "None"],
-        ["vip_status", "vip_status", "String 'true'/'false' → boolean"],
+        ["account_type", "account_type", "Informational — not scored"],
         ["last_login_date", "login_days_ago", "DATE → (today − date).days"],
         ["last_deposit_date", "last_deposit_days_ago", "DATE → (today − date).days"],
         ["last_withdrawal_date", "last_withdrawal_days_ago", "DATE → (today − date).days"],
