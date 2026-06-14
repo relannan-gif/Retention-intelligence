@@ -9,9 +9,12 @@ st.set_page_config(page_title="Action Center", page_icon="🚨", layout="wide")
 from utils.helpers import (
     apply_theme, load_data, fmt_currency, page_header,
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, MUTED, PLOTLY_LAYOUT,
+    get_plotly_layout,
 )
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
 page_header("🚨 Action Center",
             "Profitability-first · protect the most revenue today")
 
@@ -70,7 +73,7 @@ with ac1:
                   color="count", color_continuous_scale="Reds",
                   title="Clients by Recommended Action",
                   labels={"count": "Clients", "action": ""})
-    fig1.update_layout(**PLOTLY_LAYOUT, height=320, showlegend=False,
+    fig1.update_layout(**get_plotly_layout(), height=320, showlegend=False,
                        coloraxis_showscale=False)
     st.plotly_chart(fig1, use_container_width=True)
 
@@ -80,7 +83,7 @@ with ac2:
     fig2 = px.pie(owner_counts, names="owner", values="count",
                   title="Action Distribution by Recommended Owner",
                   color_discrete_sequence=[GOLD, RED, GREEN, BLUE, PURPLE])
-    fig2.update_layout(**PLOTLY_LAYOUT, height=320)
+    fig2.update_layout(**get_plotly_layout(), height=320)
     st.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
@@ -171,5 +174,5 @@ else:
     fig3 = px.bar(country_counts, x="country", y="count",
                   title=f"Country breakdown — '{sel_action}'",
                   color_discrete_sequence=[GOLD])
-    fig3.update_layout(**PLOTLY_LAYOUT, height=260)
+    fig3.update_layout(**get_plotly_layout(), height=260)
     st.plotly_chart(fig3, use_container_width=True)

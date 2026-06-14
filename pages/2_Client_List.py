@@ -8,9 +8,12 @@ st.set_page_config(page_title="Client List", page_icon="👥", layout="wide")
 from utils.helpers import (
     apply_theme, load_data, fmt_currency, page_header,
     GOLD, RED, GREEN, AMBER, BLUE, MUTED, PLOTLY_LAYOUT,
+    get_plotly_layout,
 )
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
 page_header("👥 Client List", "All 300 clients · 6 scores · searchable and filterable")
 
 df = load_data()
@@ -183,7 +186,7 @@ else:
             text=[f"{v:.0f}" for v in rf.values()], textposition="outside",
         ))
         fig_rf.update_layout(
-            **PLOTLY_LAYOUT, height=260,
+            **get_plotly_layout(), height=260,
             title=dict(text=f"Risk Factors  (score = {row['retention_risk_score']:.0f})",
                        font=dict(color=RED, size=12)),
             xaxis=dict(range=[0,105], title="Band Score (0–100)"),
@@ -198,7 +201,7 @@ else:
             text=[f"{v:.0f}" for v in vf.values()], textposition="outside",
         ))
         fig_vf.update_layout(
-            **PLOTLY_LAYOUT, height=260,
+            **get_plotly_layout(), height=260,
             title=dict(text=f"Value Factors  (score = {row['commercial_value_score']:.0f})",
                        font=dict(color=BLUE, size=12)),
             xaxis=dict(range=[0,105], title="Band Score (0–100)"),

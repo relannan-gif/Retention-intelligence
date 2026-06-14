@@ -10,11 +10,35 @@ from utils.helpers import (
     DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS, DEFAULT_THRESHOLDS,
     GOLD, RED, GREEN, AMBER, BLUE,
 )
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
 page_header("⚙️ Settings", "Configure scoring thresholds · save changes · preview impact")
 
 t = st.session_state.get("thresholds", DEFAULT_THRESHOLDS.copy()).copy()
+
+# ── Appearance ─────────────────────────────────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Appearance</h4>", unsafe_allow_html=True)
+_theme_options = {"OneRoyal Dark": "dark", "OneRoyal Light": "light"}
+_current_theme_name = {v: k for k, v in _theme_options.items()}.get(
+    st.session_state.get("theme", "dark"), "OneRoyal Dark"
+)
+_selected_name = st.radio(
+    "Select Theme",
+    list(_theme_options.keys()),
+    index=list(_theme_options.keys()).index(_current_theme_name),
+    horizontal=True,
+    key="theme_selector",
+)
+_new_theme = _theme_options[_selected_name]
+if _new_theme != st.session_state.get("theme", "dark"):
+    st.session_state["theme"] = _new_theme
+    st.rerun()
+
+st.caption("Theme changes apply immediately across all pages.")
+
+st.divider()
 
 # ── Scoring thresholds ────────────────────────────────────────────────────────
 st.markdown(f"<h4 style='color:{GOLD}'>Scoring Thresholds</h4>", unsafe_allow_html=True)

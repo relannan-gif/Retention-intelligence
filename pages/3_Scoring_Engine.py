@@ -11,9 +11,12 @@ from utils.helpers import (
     DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS,
     DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS,
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, PLOTLY_LAYOUT,
+    get_plotly_layout,
 )
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
 page_header("⚙️ Scoring Engine",
             "Six book-aware scores · adjust weights · live scatter analysis")
 
@@ -262,7 +265,7 @@ with tab_dist:
                                color_discrete_sequence=[color],
                                title=f"{label} Distribution",
                                labels={col_name: label})
-            fig.update_layout(**PLOTLY_LAYOUT, height=240, showlegend=False)
+            fig.update_layout(**get_plotly_layout(), height=240, showlegend=False)
             col.plotly_chart(fig, use_container_width=True)
 
     st.divider()
@@ -293,5 +296,5 @@ with tab_dist:
     fig_sc.add_vline(x=t["high_profitability"], line_dash="dash", line_color=GREEN,
                      annotation_text=f"High Profit ({t['high_profitability']})",
                      annotation_font_color=GREEN)
-    fig_sc.update_layout(**PLOTLY_LAYOUT)
+    fig_sc.update_layout(**get_plotly_layout())
     st.plotly_chart(fig_sc, use_container_width=True)

@@ -14,9 +14,13 @@ st.set_page_config(
 from utils.helpers import (
     apply_theme, load_data, page_header, fmt_currency,
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, MUTED,
+    get_colors,
 )
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
+C = get_colors()
 page_header(
     "📂 Data Management",
     "Configure data sources · upload client data · monitor refresh schedule · data quality",
@@ -90,7 +94,7 @@ with tab_sample:
 
         if dm.get_data_source() == "sample":
             st.markdown(
-                f"<div style='background:#141B2D;border:1px solid #F0B429;border-radius:8px;"
+                f"<div style='background:{C['card']};border:1px solid #F0B429;border-radius:8px;"
                 f"padding:12px;margin-top:8px;text-align:center'>"
                 f"<b style='color:{GOLD}'>✓ Currently Active</b></div>",
                 unsafe_allow_html=True,
@@ -477,7 +481,7 @@ with rc2:
     q_report = dm.get_quality_report()
     duration = st.session_state.get("last_refresh_duration_s", "—")
 
-    st.markdown(f"<div style='background:#141B2D;border:1px solid #1E2D4A;border-radius:8px;padding:16px'>", unsafe_allow_html=True)
+    st.markdown(f"<div style='background:{C['card']};border:1px solid {C['border']};border-radius:8px;padding:16px'>", unsafe_allow_html=True)
     st.markdown(f"**Last Successful Refresh**  \n{last_r.strftime('%d %b %Y · %H:%M') if last_r else 'Never'}")
     st.markdown(f"**Next Scheduled Refresh**  \n{next_r.strftime('%d %b %Y · %H:%M') if next_r else 'Not scheduled'}")
     st.markdown(f"**Records Loaded**  \n{dm.get_records_count():,}")
@@ -502,10 +506,10 @@ qcolor   = GREEN if qscore >= 80 else (AMBER if qscore >= 60 else RED)
 qs_col, qd_col = st.columns([1, 3])
 with qs_col:
     st.markdown(
-        f"<div style='background:#141B2D;border:2px solid {qcolor};border-radius:12px;"
+        f"<div style='background:{C['card']};border:2px solid {qcolor};border-radius:12px;"
         f"padding:24px;text-align:center'>"
         f"<div style='font-size:48px;font-weight:700;color:{qcolor}'>{qscore}</div>"
-        f"<div style='color:#94A3B8;font-size:14px'>Quality Score / 100</div>"
+        f"<div style='color:{C['muted']};font-size:14px'>Quality Score / 100</div>"
         f"<div style='color:{qcolor};font-size:12px;margin-top:4px'>"
         f"{'Excellent' if qscore >= 80 else 'Needs Attention' if qscore >= 60 else 'Poor — fix issues'}"
         f"</div></div>",

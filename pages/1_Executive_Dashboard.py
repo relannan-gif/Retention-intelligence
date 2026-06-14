@@ -10,10 +10,14 @@ st.set_page_config(page_title="Executive Dashboard", page_icon="📈", layout="w
 from utils.helpers import (
     apply_theme, load_data, fmt_currency, page_header,
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, BG, CARD, PLOTLY_LAYOUT, MUTED,
+    get_colors, get_plotly_layout,
 )
 from utils.scoring import generate_trend_snapshots
+from utils.session_init import init_session_state
 
 apply_theme()
+init_session_state()
+C = get_colors()
 page_header("📈 Executive Dashboard",
             "Board-level retention intelligence · A-Book · B-Book · M-Book")
 
@@ -100,7 +104,7 @@ with r1c1:
     fig.add_vline(x=hr, line_dash="dash", line_color=GOLD, line_width=2,
                   annotation_text=f"High Risk ({hr})",
                   annotation_font_color=GOLD)
-    fig.update_layout(**PLOTLY_LAYOUT, height=300, showlegend=False)
+    fig.update_layout(**get_plotly_layout(), height=300, showlegend=False)
     st.plotly_chart(fig, use_container_width=True)
 
 with r1c2:
@@ -114,7 +118,7 @@ with r1c2:
                   color_discrete_map=health_colors,
                   title="Client Health Distribution",
                   labels={"health_label":"Health", "count":"Clients"})
-    fig2.update_layout(**PLOTLY_LAYOUT, height=300, showlegend=False)
+    fig2.update_layout(**get_plotly_layout(), height=300, showlegend=False)
     st.plotly_chart(fig2, use_container_width=True)
 
 # ── Row 2: Profitability ──────────────────────────────────────────────────────
@@ -128,7 +132,7 @@ with r2c1:
         title="Profitability Score Distribution",
         labels={"profitability_score": "Profitability Score (0–100)"},
     )
-    fig3.update_layout(**PLOTLY_LAYOUT, height=300, showlegend=False)
+    fig3.update_layout(**get_plotly_layout(), height=300, showlegend=False)
     st.plotly_chart(fig3, use_container_width=True)
 
 with r2c2:
@@ -149,9 +153,9 @@ with r2c2:
             marker_color=colors_map[row["book_type"]],
             text=f"Avg PnL: {fmt_currency(row['total_pnl']/row['clients'])}/client",
             textposition="outside",
-            textfont=dict(color="#E8E8E8", size=10),
+            textfont=dict(color=C["text"], size=10),
         ))
-    fig4.update_layout(**PLOTLY_LAYOUT, height=300, showlegend=True,
+    fig4.update_layout(**get_plotly_layout(), height=300, showlegend=True,
                        title="Avg Profitability Score by Book Type",
                        yaxis_title="Avg Profitability Score")
     st.plotly_chart(fig4, use_container_width=True)
@@ -176,7 +180,7 @@ with r3c1:
                   color="annual_revenue", color_continuous_scale="Reds",
                   title="Annual Revenue At Risk by Country (Top 10)",
                   labels={"annual_revenue": "Annual Revenue At Risk ($)", "country": ""})
-    fig5.update_layout(**PLOTLY_LAYOUT, height=360, showlegend=False,
+    fig5.update_layout(**get_plotly_layout(), height=360, showlegend=False,
                        coloraxis_showscale=False)
     st.plotly_chart(fig5, use_container_width=True)
 
@@ -187,7 +191,7 @@ with r3c2:
                   color="annual_pnl", color_continuous_scale="Greens",
                   title="Annual Profitability At Risk by Country (Top 10)",
                   labels={"annual_pnl": "Annual Profitability At Risk ($)", "country": ""})
-    fig6.update_layout(**PLOTLY_LAYOUT, height=360, showlegend=False,
+    fig6.update_layout(**get_plotly_layout(), height=360, showlegend=False,
                        coloraxis_showscale=False)
     st.plotly_chart(fig6, use_container_width=True)
 
@@ -203,7 +207,7 @@ with r4c1:
                   color="annual_revenue", color_continuous_scale="Oranges",
                   title="Annual Revenue At Risk by Account Manager",
                   labels={"annual_revenue": "Revenue At Risk ($)", "account_manager": ""})
-    fig7.update_layout(**PLOTLY_LAYOUT, height=340, showlegend=False,
+    fig7.update_layout(**get_plotly_layout(), height=340, showlegend=False,
                        coloraxis_showscale=False)
     st.plotly_chart(fig7, use_container_width=True)
 
@@ -214,7 +218,7 @@ with r4c2:
                   color="annual_pnl", color_continuous_scale="Greens",
                   title="Annual Profitability At Risk by Account Manager",
                   labels={"annual_pnl": "Profitability At Risk ($)", "account_manager": ""})
-    fig8.update_layout(**PLOTLY_LAYOUT, height=340, showlegend=False,
+    fig8.update_layout(**get_plotly_layout(), height=340, showlegend=False,
                        coloraxis_showscale=False)
     st.plotly_chart(fig8, use_container_width=True)
 
@@ -264,13 +268,13 @@ for rk in rows_order:
 
 fig_matrix = go.Figure(data=go.Heatmap(
     z=z_vals, x=cols_order, y=rows_order,
-    colorscale=[[0, "#0F1629"], [0.5, "#1E3A5F"], [1, "#1E4D2B"]],
+    colorscale=[[0, C["secondary_bg"]], [0.5, "#1E3A5F"], [1, "#1E4D2B"]],
     text=ann_text, texttemplate="%{text}",
-    textfont=dict(color="#E8E8E8", size=13),
+    textfont=dict(color=C["text"], size=13),
     showscale=False,
 ))
 fig_matrix.update_layout(
-    **PLOTLY_LAYOUT, height=260,
+    **get_plotly_layout(), height=260,
     xaxis=dict(side="top", tickfont=dict(color=GOLD, size=12)),
     yaxis=dict(tickfont=dict(color=GOLD, size=12)),
     title="Client Segmentation Matrix — Count per Cell",
@@ -310,7 +314,7 @@ def trend_chart(tdf, title, y_col, color, y_label):
                   markers=True, color_discrete_sequence=[color],
                   title=title, labels={"date_str": "Date", y_col: y_label})
     fig.update_traces(line=dict(width=2.5))
-    fig.update_layout(**PLOTLY_LAYOUT, height=250)
+    fig.update_layout(**get_plotly_layout(), height=250)
     return fig
 
 for tab, n_rows in [(tab30,2),(tab90,4),(tab180,5),(tabfull,6)]:

@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 from data.sample_data import generate_clients
 from utils.scoring import score_dataframe
+from config.theme import THEMES, GOLD, RED, GREEN, AMBER, BLUE, PURPLE
 
 # ── Default weights ───────────────────────────────────────────────────────────
 
@@ -45,98 +46,130 @@ DEFAULT_THRESHOLDS = {
     "dormant_days":          30,
 }
 
-# ── Theme colors (used in charts and helpers) ─────────────────────────────────
+# ── Dark-theme backward-compat constants ──────────────────────────────────────
+# Semantic colors are always the same. Background/card/text colors below are
+# dark-theme defaults kept for backward compatibility.
+# Use get_colors() for theme-aware rendering.
 
-GOLD   = "#F0B429"
-RED    = "#EF4444"
-GREEN  = "#10B981"
-AMBER  = "#F59E0B"
-BLUE   = "#3B82F6"
-PURPLE = "#8B5CF6"
-BG     = "#0A0E1A"
-CARD   = "#141B2D"
-BORDER = "#1E2D4A"
-TEXT   = "#E8E8E8"
-MUTED  = "#94A3B8"
+_DARK  = THEMES["dark"]
+BG     = _DARK["bg"]
+CARD   = _DARK["card"]
+BORDER = _DARK["border"]
+TEXT   = _DARK["text"]
+MUTED  = _DARK["muted"]
 
 PLOTLY_LAYOUT = dict(
     paper_bgcolor=BG,
-    plot_bgcolor="#0F1629",
+    plot_bgcolor=_DARK["plot_bg"],
     font=dict(color=TEXT, family="Inter, sans-serif"),
     margin=dict(l=10, r=10, t=40, b=10),
     coloraxis_colorbar=dict(tickfont=dict(color=TEXT)),
 )
 
 
+# ── Theme-aware helpers ───────────────────────────────────────────────────────
+
+def get_colors() -> dict:
+    """
+    Return the current theme's color palette. Call at render time, not import time.
+    Keys: bg, card, secondary_bg, sidebar_bg, plot_bg, text, muted, border, input_bg,
+          plus semantic: gold, red, green, amber, blue, purple.
+    """
+    theme_key = st.session_state.get("theme", "dark")
+    t = THEMES.get(theme_key, THEMES["dark"])
+    return {
+        **t,
+        "gold": GOLD, "red": RED, "green": GREEN,
+        "amber": AMBER, "blue": BLUE, "purple": PURPLE,
+    }
+
+
+def get_plotly_layout(**overrides) -> dict:
+    """
+    Return a theme-aware Plotly layout dict. Keyword overrides replace defaults.
+    Use instead of **PLOTLY_LAYOUT so charts adapt to Dark and Light themes.
+    """
+    c = get_colors()
+    base = dict(
+        paper_bgcolor=c["bg"],
+        plot_bgcolor=c["plot_bg"],
+        font=dict(color=c["text"], family="Inter, sans-serif"),
+        margin=dict(l=10, r=10, t=40, b=10),
+        coloraxis_colorbar=dict(tickfont=dict(color=c["text"])),
+    )
+    base.update(overrides)
+    return base
+
+
+# ── Theme CSS ─────────────────────────────────────────────────────────────────
+
 def apply_theme():
-    """Inject CSS for the dark gold executive theme."""
-    st.markdown("""
+    """Inject CSS for the currently selected theme (dark or light)."""
+    theme_key = st.session_state.get("theme", "dark")
+    t = THEMES.get(theme_key, THEMES["dark"])
+
+    bg       = t["bg"]
+    card     = t["card"]
+    sidebar  = t["sidebar_bg"]
+    border   = t["border"]
+    text     = t["text"]
+    muted    = t["muted"]
+    sec      = t["secondary_bg"]
+    input_bg = t["input_bg"]
+
+    st.markdown(f"""
     <style>
-    /* Main background */
-    .stApp { background-color: #0A0E1A; color: #E8E8E8; }
-    .stApp > header { background-color: #0A0E1A; }
+    .stApp {{ background-color: {bg}; color: {text}; }}
+    .stApp > header {{ background-color: {bg}; }}
 
-    /* Sidebar */
-    [data-testid="stSidebar"] { background-color: #0F1629; border-right: 1px solid #1E2D4A; }
-    [data-testid="stSidebar"] * { color: #E8E8E8 !important; }
+    [data-testid="stSidebar"] {{ background-color: {sidebar}; border-right: 1px solid {border}; }}
+    [data-testid="stSidebar"] * {{ color: {text} !important; }}
 
-    /* Metric cards */
-    [data-testid="stMetric"] {
-        background-color: #141B2D;
-        border: 1px solid #1E2D4A;
+    [data-testid="stMetric"] {{
+        background-color: {card};
+        border: 1px solid {border};
         border-radius: 8px;
         padding: 12px 16px;
-    }
-    [data-testid="stMetricLabel"] { color: #94A3B8 !important; font-size: 12px; }
-    [data-testid="stMetricValue"] { color: #F0B429 !important; font-size: 22px; font-weight: 700; }
-    [data-testid="stMetricDelta"] { color: #94A3B8 !important; }
+    }}
+    [data-testid="stMetricLabel"] {{ color: {muted} !important; font-size: 12px; }}
+    [data-testid="stMetricValue"] {{ color: {GOLD} !important; font-size: 22px; font-weight: 700; }}
+    [data-testid="stMetricDelta"] {{ color: {muted} !important; }}
 
-    /* Expander */
-    [data-testid="stExpander"] {
-        background-color: #0F1629;
-        border: 1px solid #1E2D4A;
+    [data-testid="stExpander"] {{
+        background-color: {sec};
+        border: 1px solid {border};
         border-radius: 8px;
-    }
+    }}
 
-    /* Selectbox / inputs */
-    [data-testid="stSelectbox"] > div > div { background-color: #141B2D; color: #E8E8E8; }
-    .stTextInput input { background-color: #141B2D; color: #E8E8E8; border-color: #1E2D4A; }
-    .stMultiSelect > div { background-color: #141B2D; }
+    [data-testid="stSelectbox"] > div > div {{ background-color: {input_bg}; color: {text}; }}
+    .stTextInput input {{ background-color: {input_bg}; color: {text}; border-color: {border}; }}
+    .stMultiSelect > div {{ background-color: {input_bg}; }}
 
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] { background-color: #0F1629; border-bottom: 1px solid #1E2D4A; }
-    .stTabs [data-baseweb="tab"] { color: #94A3B8; }
-    .stTabs [aria-selected="true"] { color: #F0B429 !important; border-bottom: 2px solid #F0B429; }
+    .stTabs [data-baseweb="tab-list"] {{ background-color: {sec}; border-bottom: 1px solid {border}; }}
+    .stTabs [data-baseweb="tab"] {{ color: {muted}; }}
+    .stTabs [aria-selected="true"] {{ color: {GOLD} !important; border-bottom: 2px solid {GOLD}; }}
 
-    /* Buttons */
-    .stButton > button {
-        background-color: #1E2D4A;
-        color: #F0B429;
-        border: 1px solid #F0B429;
+    .stButton > button {{
+        background-color: {card};
+        color: {GOLD};
+        border: 1px solid {GOLD};
         border-radius: 6px;
         font-weight: 600;
-    }
-    .stButton > button:hover { background-color: #F0B429; color: #0A0E1A; }
+    }}
+    .stButton > button:hover {{ background-color: {GOLD}; color: {bg}; }}
+    .stButton > button[kind="primary"] {{ background-color: {GOLD}; color: {bg}; }}
 
-    /* Primary button */
-    .stButton > button[kind="primary"] { background-color: #F0B429; color: #0A0E1A; }
+    [data-testid="stSlider"] > div > div > div {{ background-color: {GOLD} !important; }}
 
-    /* Sliders */
-    [data-testid="stSlider"] > div > div > div { background-color: #F0B429 !important; }
+    [data-testid="stDataFrame"] {{ background-color: {card}; }}
+    iframe {{ background-color: {card} !important; }}
 
-    /* Dataframe / tables */
-    [data-testid="stDataFrame"] { background-color: #141B2D; }
-    iframe { background-color: #141B2D !important; }
+    hr {{ border-color: {border}; }}
 
-    /* Divider */
-    hr { border-color: #1E2D4A; }
+    [data-testid="stAlert"] {{ background-color: {card}; border-color: {border}; }}
 
-    /* Info / success boxes */
-    [data-testid="stAlert"] { background-color: #141B2D; border-color: #1E2D4A; }
-
-    /* Markdown text */
-    .stMarkdown p, .stMarkdown li { color: #E8E8E8; }
-    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 { color: #F0B429; }
+    .stMarkdown p, .stMarkdown li {{ color: {text}; }}
+    .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{ color: {GOLD}; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -184,7 +217,6 @@ def _rescore_from_raw(raw: pd.DataFrame):
         rules=st.session_state["scoring_rules"],
     )
     st.session_state["scored_df"] = scored
-    # Persist snapshot + refresh log
     try:
         init_db()
         source = st.session_state.get("data_source", "sample")
@@ -220,7 +252,7 @@ def get_risk_color(score: float) -> str:
 
 def page_header(title: str, subtitle: str = ""):
     st.markdown(
-        f"<h2 style='color:#F0B429;margin-bottom:2px'>{title}</h2>",
+        f"<h2 style='color:{GOLD};margin-bottom:2px'>{title}</h2>",
         unsafe_allow_html=True
     )
     if subtitle:
