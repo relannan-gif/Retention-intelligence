@@ -111,25 +111,29 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
         )
 
         # --- NEW FIELDS: Book-type aware revenue ---
-        # swap_revenue: A-Book gets lognormal based on equity, B-Book=0, M-Book=smaller amount
+        # swap_revenue: all book types earn swap from client overnight positions
         if book_type == "A-Book":
             swap_revenue = round(max(0, np.random.lognormal(
                 mean=np.log(max(current_equity * 0.002, 0.01)), sigma=0.5
             )), 2)
         elif book_type == "B-Book":
-            swap_revenue = 0.0
+            swap_revenue = round(max(0, np.random.lognormal(
+                mean=np.log(max(current_equity * 0.0015, 0.01)), sigma=0.5
+            )), 2)
         else:  # M-Book
             swap_revenue = round(max(0, np.random.lognormal(
                 mean=np.log(max(current_equity * 0.001, 0.01)), sigma=0.5
             )), 2)
 
-        # commission_revenue: A-Book volume * 0.0001-0.0005, B-Book=0, M-Book=small
+        # commission_revenue: A-Book = higher rate, B-Book = lower (spread markup), M-Book = mid
         if book_type == "A-Book":
             commission_revenue = round(
                 trading_volume_last_30d * np.random.uniform(0.0001, 0.0005), 2
             )
         elif book_type == "B-Book":
-            commission_revenue = 0.0
+            commission_revenue = round(
+                trading_volume_last_30d * np.random.uniform(0.00005, 0.0002), 2
+            )
         else:  # M-Book
             commission_revenue = round(
                 trading_volume_last_30d * np.random.uniform(0.00005, 0.0002), 2
@@ -169,7 +173,8 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             )
         elif book_type == "B-Book":
             net_company_pnl = round(
-                captured_client_losses + spread_commission_revenue, 2
+                captured_client_losses + commission_revenue + swap_revenue
+                + spread_commission_revenue, 2
             )
         else:  # M-Book
             net_company_pnl = round(

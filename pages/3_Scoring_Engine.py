@@ -51,8 +51,8 @@ redeposit count · client tenure · VIP status (counts heavily)
 | Book Type | How Profitability is Calculated |
 |-----------|--------------------------------|
 | **A-Book** | Spread revenue + Commission + Swap income |
-| **B-Book** | Captured client losses + Spread revenue |
-| **M-Book** | 60% × captured losses + Spread + Commission + Swap |
+| **B-Book** | Captured client losses + Commission + Swap + Spread |
+| **M-Book** | (internal ratio) × captured losses + Spread + Commission + Swap |
 
 B-Book clients who are winning (costing the company money) will score LOW here.
 B-Book clients who are losing (profitable for OneRoyal) will score HIGH.
@@ -93,10 +93,71 @@ Formula: `Risk×30% + Value×25% + Profitability×30% + Reactivation×15%`
 """, unsafe_allow_html=True)
 
 # ── Tabs for each score group ─────────────────────────────────────────────────
-tab_risk, tab_val, tab_react, tab_vip, tab_dist = st.tabs([
-    "Risk Weights", "Value Weights", "Reactivation Weights",
+tab_rules, tab_risk, tab_val, tab_react, tab_vip, tab_dist = st.tabs([
+    "Active Scoring Rules", "Risk Weights", "Value Weights", "Reactivation Weights",
     "VIP Upside Weights", "Score Distributions",
 ])
+
+# ── Active Scoring Rules (read-only summary) ──────────────────────────────────
+with tab_rules:
+    from utils.rules_engine import load_rules
+    import pandas as _pd
+
+    if "scoring_rules" not in st.session_state:
+        st.session_state["scoring_rules"] = load_rules()
+    _rules = st.session_state["scoring_rules"]
+
+    st.markdown(
+        f"<h4 style='color:{GOLD}'>Active Business Rules — current scoring configuration</h4>",
+        unsafe_allow_html=True,
+    )
+    st.caption("These are the rules currently in use. Edit them in the ⚙️ Settings page → Business Rules Engine section.")
+
+    def _rules_table(factor_dict: dict):
+        rows = []
+        for fkey, fdata in factor_dict.items():
+            for band in fdata["bands"]:
+                rows.append({
+                    "Factor":    fdata["label"],
+                    "Band":      band["label"],
+                    "Points":    band["points"],
+                })
+        return _pd.DataFrame(rows)
+
+    col_rr, col_cv = st.columns(2)
+    with col_rr:
+        st.markdown(f"<h5 style='color:{GOLD}'>Retention Risk Factors</h5>",
+                    unsafe_allow_html=True)
+        rr_df = _rules_table(_rules["retention_risk"])
+        st.dataframe(rr_df, hide_index=True, use_container_width=True)
+
+    with col_cv:
+        st.markdown(f"<h5 style='color:{GOLD}'>Commercial Value Factors</h5>",
+                    unsafe_allow_html=True)
+        cv_df = _rules_table(_rules["commercial_value"])
+        st.dataframe(cv_df, hide_index=True, use_container_width=True)
+
+    st.divider()
+    st.markdown(f"<h5 style='color:{GOLD}'>Profitability Bands (by Book Type)</h5>",
+                unsafe_allow_html=True)
+    pr = _rules["profitability"]
+    m_ratio = pr["m_book"].get("internal_ratio", 0.6)
+    st.caption(f"M-Book internal ratio: **{m_ratio:.0%}** of client losses held internally")
+    pc1, pc2, pc3 = st.columns(3)
+    for col, bkey, clr in [
+        (pc1, "a_book", BLUE),
+        (pc2, "b_book", RED),
+        (pc3, "m_book", PURPLE),
+    ]:
+        bdata = pr[bkey]
+        col.markdown(
+            f"<b style='color:{clr}'>{bdata['label']}</b><br>"
+            f"<small style='color:#94A3B8'>{bdata.get('formula_label','')}</small>",
+            unsafe_allow_html=True,
+        )
+        brows = [{"Band": b["label"], "Points": b["points"]} for b in bdata["bands"]]
+        col.dataframe(_pd.DataFrame(brows), hide_index=True, use_container_width=True)
+
 
 # ── Risk weights ──────────────────────────────────────────────────────────────
 with tab_risk:

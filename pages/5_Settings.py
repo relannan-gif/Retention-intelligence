@@ -140,3 +140,130 @@ with col_rw:
 with col_vw:
     st.markdown("**Value Weights**")
     st.write(st.session_state.get("value_weights", DEFAULT_VALUE_WEIGHTS))
+
+st.divider()
+
+# ── Business Rules Engine ──────────────────────────────────────────────────────
+import copy
+from utils.rules_engine import load_rules, save_rules
+
+st.markdown(f"<h4 style='color:{GOLD}'>Business Rules Engine — Scoring Bands</h4>",
+            unsafe_allow_html=True)
+st.caption(
+    "Each factor is scored by matching the client's value against tiered bands. "
+    "Edit the **Points** column (0–100) to change how much weight each band carries. "
+    "Higher points = stronger signal. Click **Save Rules & Rescore** to apply."
+)
+
+if "scoring_rules" not in st.session_state:
+    st.session_state["scoring_rules"] = load_rules()
+
+_current_rules = st.session_state["scoring_rules"]
+_edited = copy.deepcopy(_current_rules)
+
+
+def _band_editor(section: str, factor_key: str, bands: list) -> list:
+    hc1, hc2 = st.columns([4, 1])
+    hc1.markdown("<small style='color:#94A3B8'>Band Condition</small>",
+                 unsafe_allow_html=True)
+    hc2.markdown("<small style='color:#94A3B8'>Points</small>",
+                 unsafe_allow_html=True)
+    updated = []
+    for i, band in enumerate(bands):
+        c1, c2 = st.columns([4, 1])
+        c1.markdown(
+            f"<span style='color:#E8E8E8'>&nbsp;&nbsp;{band['label']}</span>",
+            unsafe_allow_html=True,
+        )
+        pts = c2.number_input(
+            "Points",
+            min_value=0,
+            max_value=100,
+            value=int(band["points"]),
+            key=f"band_{section}_{factor_key}_{i}",
+            label_visibility="collapsed",
+        )
+        b = dict(band)
+        b["points"] = int(pts)
+        updated.append(b)
+    return updated
+
+
+tab_rr, tab_cv, tab_prof = st.tabs([
+    "Retention Risk Factors",
+    "Commercial Value Factors",
+    "Profitability Bands",
+])
+
+with tab_rr:
+    st.caption("These bands drive the **Retention Risk Score**. "
+               "Higher points = client is flagged as more at risk of leaving.")
+    for fkey, fdata in _edited["retention_risk"].items():
+        with st.expander(
+            f"**{fdata['label']}** · _{fdata['description']}_",
+            expanded=False,
+        ):
+            _edited["retention_risk"][fkey]["bands"] = _band_editor(
+                "rr", fkey, fdata["bands"]
+            )
+
+with tab_cv:
+    st.caption("These bands drive the **Commercial Value Score**. "
+               "Higher points = client is considered more commercially important.")
+    for fkey, fdata in _edited["commercial_value"].items():
+        with st.expander(
+            f"**{fdata['label']}** · _{fdata['description']}_",
+            expanded=False,
+        ):
+            _edited["commercial_value"][fkey]["bands"] = _band_editor(
+                "cv", fkey, fdata["bands"]
+            )
+
+with tab_prof:
+    st.caption(
+        "These bands drive the **Profitability Score**, separated by book type. "
+        "Each book type has its own dollar thresholds because A-Book profits are "
+        "purely revenue-based while B-Book profits include captured client losses."
+    )
+    st.markdown(f"<h5 style='color:{GOLD}'>M-Book Configuration</h5>",
+                unsafe_allow_html=True)
+    _edited["profitability"]["m_book"]["internal_ratio"] = st.slider(
+        "M-Book internal ratio — fraction of client losses held internally (B-Book style)",
+        min_value=0.10,
+        max_value=1.00,
+        value=float(_current_rules["profitability"]["m_book"].get("internal_ratio", 0.6)),
+        step=0.05,
+        key="m_book_ratio",
+        help="1.0 = fully B-Book (all losses held); 0.0 = fully A-Book (all hedged externally)",
+    )
+    st.divider()
+    for bkey in ["a_book", "b_book", "m_book"]:
+        bdata = _edited["profitability"][bkey]
+        formula = bdata.get("formula_label", "")
+        with st.expander(
+            f"**{bdata['label']}** · `{formula}`",
+            expanded=False,
+        ):
+            _edited["profitability"][bkey]["bands"] = _band_editor(
+                "prof", bkey, bdata["bands"]
+            )
+
+st.divider()
+sr1, sr2 = st.columns([2, 1])
+with sr1:
+    if st.button("Save Scoring Rules & Rescore All Clients",
+                 type="primary", key="save_scoring_rules"):
+        st.session_state["scoring_rules"] = _edited
+        save_rules(_edited)
+        rescore()
+        st.success(
+            "Scoring rules saved to `config/scoring_rules.json`. "
+            "All 300 clients have been rescored using the new bands."
+        )
+        st.rerun()
+with sr2:
+    if st.button("Reload Rules from File", key="reset_rules"):
+        st.session_state["scoring_rules"] = load_rules()
+        rescore()
+        st.success("Scoring rules reloaded from `config/scoring_rules.json`.")
+        st.rerun()

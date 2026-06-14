@@ -167,6 +167,9 @@ def rescore():
 
 
 def _rescore_from_raw(raw: pd.DataFrame):
+    from utils.rules_engine import load_rules
+    if "scoring_rules" not in st.session_state:
+        st.session_state["scoring_rules"] = load_rules()
     st.session_state["scored_df"] = score_dataframe(
         raw,
         st.session_state.get("risk_weights",  DEFAULT_RISK_WEIGHTS),
@@ -175,6 +178,7 @@ def _rescore_from_raw(raw: pd.DataFrame):
         st.session_state.get("react_weights", DEFAULT_REACT_WEIGHTS),
         st.session_state.get("vip_weights",   DEFAULT_VIP_WEIGHTS),
         st.session_state.get("thresholds",    DEFAULT_THRESHOLDS),
+        rules=st.session_state["scoring_rules"],
     )
 
 

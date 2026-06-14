@@ -1,0 +1,186 @@
+{
+  "version": "1.0",
+  "description": "OneRoyal Client Intelligence — Business Scoring Rules. Edit thresholds and points here or via the Settings UI. All points on a 0-100 scale.",
+
+  "retention_risk": {
+    "withdrawal_risk": {
+      "label": "Withdrawal Risk",
+      "description": "Withdrawal amount as % of current equity in the last 30 days",
+      "unit": "%",
+      "bands": [
+        {"label": "Minimal  (<10%)",      "op": "lt",      "threshold": 10,  "points": 10},
+        {"label": "Moderate (10–30%)",    "op": "between", "low": 10, "high": 30, "points": 50},
+        {"label": "High     (>30%)",      "op": "gte",     "threshold": 30,  "points": 90}
+      ]
+    },
+    "volume_drop": {
+      "label": "Trading Volume Drop",
+      "description": "% decline in trading volume vs previous 30-day period",
+      "unit": "%",
+      "bands": [
+        {"label": "Stable or growing (≤0%)",   "op": "lte",     "threshold": 0,  "points": 5},
+        {"label": "Mild drop   (0–30%)",        "op": "between", "low": 0, "high": 30, "points": 30},
+        {"label": "Significant (30–60%)",       "op": "between", "low": 30, "high": 60, "points": 65},
+        {"label": "Major drop  (>60%)",         "op": "gte",     "threshold": 60, "points": 90}
+      ]
+    },
+    "login_inactivity": {
+      "label": "Login Inactivity",
+      "description": "Days since the client last logged in",
+      "unit": "days",
+      "bands": [
+        {"label": "Active        (<7d)",     "op": "lt",      "threshold": 7,  "points": 5},
+        {"label": "Mild gap      (7–30d)",   "op": "between", "low": 7,  "high": 30,  "points": 25},
+        {"label": "Dormant       (30–90d)",  "op": "between", "low": 30, "high": 90,  "points": 65},
+        {"label": "Long inactive (>90d)",    "op": "gte",     "threshold": 90, "points": 90}
+      ]
+    },
+    "deposit_inactivity": {
+      "label": "Deposit Inactivity",
+      "description": "Days since the client's last deposit",
+      "unit": "days",
+      "bands": [
+        {"label": "Recent depositor     (<30d)",    "op": "lt",      "threshold": 30,  "points": 5},
+        {"label": "Monthly gap          (30–90d)",  "op": "between", "low": 30,  "high": 90,  "points": 30},
+        {"label": "Infrequent depositor (90–180d)", "op": "between", "low": 90,  "high": 180, "points": 60},
+        {"label": "Lapsed depositor     (>180d)",   "op": "gte",     "threshold": 180, "points": 90}
+      ]
+    },
+    "complaints": {
+      "label": "Complaints & Open Tickets",
+      "description": "Total complaints (last 30d) + open tickets",
+      "unit": "count",
+      "bands": [
+        {"label": "No complaints (0)",    "op": "eq",      "threshold": 0,  "points": 0},
+        {"label": "1 complaint",          "op": "eq",      "threshold": 1,  "points": 50},
+        {"label": "2+ complaints",        "op": "gte",     "threshold": 2,  "points": 90}
+      ]
+    },
+    "equity_reduction": {
+      "label": "Equity Reduction (30-day)",
+      "description": "% decline in current equity compared to 30 days ago",
+      "unit": "%",
+      "bands": [
+        {"label": "Growing or stable (≤0%)", "op": "lte",     "threshold": 0,  "points": 0},
+        {"label": "Mild decline    (0–15%)", "op": "between", "low": 0,  "high": 15, "points": 30},
+        {"label": "Significant     (15–30%)","op": "between", "low": 15, "high": 30, "points": 65},
+        {"label": "Major decline   (>30%)",  "op": "gte",     "threshold": 30, "points": 90}
+      ]
+    }
+  },
+
+  "commercial_value": {
+    "lifetime_deposits": {
+      "label": "Lifetime Deposits",
+      "description": "Total USD deposited by the client since account opening",
+      "unit": "$",
+      "bands": [
+        {"label": "Micro  (<$1K)",           "op": "lt",      "threshold": 1000,   "points": 10},
+        {"label": "Small  ($1K–$10K)",       "op": "between", "low": 1000,   "high": 10000,  "points": 35},
+        {"label": "Medium ($10K–$50K)",      "op": "between", "low": 10000,  "high": 50000,  "points": 60},
+        {"label": "Large  ($50K–$200K)",     "op": "between", "low": 50000,  "high": 200000, "points": 85},
+        {"label": "Major  (>$200K)",         "op": "gte",     "threshold": 200000, "points": 100}
+      ]
+    },
+    "net_deposits": {
+      "label": "Net Deposits",
+      "description": "Lifetime deposits minus total withdrawals ($)",
+      "unit": "$",
+      "bands": [
+        {"label": "Negative or zero (<$0)", "op": "lt",      "threshold": 0,    "points": 0},
+        {"label": "Micro  ($0–$1K)",        "op": "between", "low": 0,     "high": 1000,   "points": 15},
+        {"label": "Small  ($1K–$10K)",      "op": "between", "low": 1000,  "high": 10000,  "points": 40},
+        {"label": "Medium ($10K–$50K)",     "op": "between", "low": 10000, "high": 50000,  "points": 70},
+        {"label": "Large  (>$50K)",         "op": "gte",     "threshold": 50000, "points": 100}
+      ]
+    },
+    "current_equity": {
+      "label": "Current Equity",
+      "description": "Current account balance/equity ($)",
+      "unit": "$",
+      "bands": [
+        {"label": "Under  (<$500)",          "op": "lt",      "threshold": 500,   "points": 5},
+        {"label": "Small  ($500–$5K)",       "op": "between", "low": 500,   "high": 5000,   "points": 30},
+        {"label": "Medium ($5K–$25K)",       "op": "between", "low": 5000,  "high": 25000,  "points": 60},
+        {"label": "Large  ($25K–$100K)",     "op": "between", "low": 25000, "high": 100000, "points": 85},
+        {"label": "Major  (>$100K)",         "op": "gte",     "threshold": 100000,"points": 100}
+      ]
+    },
+    "trading_volume": {
+      "label": "Trading Volume (30-day)",
+      "description": "Total trading volume in last 30 days ($)",
+      "unit": "$",
+      "bands": [
+        {"label": "Inactive (<$1K)",         "op": "lt",      "threshold": 1000,   "points": 5},
+        {"label": "Low      ($1K–$10K)",     "op": "between", "low": 1000,  "high": 10000,  "points": 25},
+        {"label": "Medium   ($10K–$100K)",   "op": "between", "low": 10000, "high": 100000, "points": 55},
+        {"label": "High     ($100K–$500K)",  "op": "between", "low": 100000,"high": 500000, "points": 80},
+        {"label": "Elite    (>$500K)",       "op": "gte",     "threshold": 500000, "points": 100}
+      ]
+    },
+    "redeposit_count": {
+      "label": "Number of Redeposits",
+      "description": "How many times the client has topped up their account",
+      "unit": "count",
+      "bands": [
+        {"label": "First deposit only (0)",  "op": "eq",      "threshold": 0,  "points": 0},
+        {"label": "Low loyalty (1–2)",       "op": "between", "low": 1,  "high": 3,  "points": 25},
+        {"label": "Moderate   (3–7)",        "op": "between", "low": 3,  "high": 8,  "points": 55},
+        {"label": "High       (8–15)",       "op": "between", "low": 8,  "high": 16, "points": 80},
+        {"label": "Champion   (>15)",        "op": "gte",     "threshold": 16, "points": 100}
+      ]
+    },
+    "client_tenure": {
+      "label": "Client Tenure",
+      "description": "Number of days since the client's first deposit",
+      "unit": "days",
+      "bands": [
+        {"label": "New       (<90d)",        "op": "lt",      "threshold": 90,  "points": 10},
+        {"label": "Recent    (90–365d)",     "op": "between", "low": 90,  "high": 365,  "points": 35},
+        {"label": "Established (1–2 years)","op": "between", "low": 365, "high": 730,  "points": 65},
+        {"label": "Long-term  (>2 years)",   "op": "gte",     "threshold": 730, "points": 100}
+      ]
+    }
+  },
+
+  "profitability": {
+    "a_book": {
+      "label": "A-Book Profitability",
+      "description": "A-Book: Spread revenue + Commission + Swap income. Client PnL is irrelevant (exposure hedged).",
+      "formula_label": "spread_revenue + commission + swap",
+      "bands": [
+        {"label": "Marginal (<$50/mo)",     "op": "lt",      "threshold": 50,   "points": 10},
+        {"label": "Low      ($50–$200/mo)", "op": "between", "low": 50,   "high": 200,  "points": 35},
+        {"label": "Medium   ($200–$500/mo)","op": "between", "low": 200,  "high": 500,  "points": 60},
+        {"label": "High     ($500–$2K/mo)", "op": "between", "low": 500,  "high": 2000, "points": 85},
+        {"label": "Elite    (>$2K/mo)",     "op": "gte",     "threshold": 2000, "points": 100}
+      ]
+    },
+    "b_book": {
+      "label": "B-Book Profitability",
+      "description": "B-Book: Captured client losses + Commission revenue + Swap income + Spread. Client losses ARE the primary profit source.",
+      "formula_label": "captured_losses + commission + swap + spread",
+      "bands": [
+        {"label": "Loss-making  (<$0/mo)",     "op": "lt",      "threshold": 0,    "points": 0},
+        {"label": "Marginal     ($0–$100/mo)", "op": "between", "low": 0,    "high": 100,  "points": 20},
+        {"label": "Low profit   ($100–$500/mo)","op":"between", "low": 100,  "high": 500,  "points": 45},
+        {"label": "Good profit  ($500–$2K/mo)","op": "between", "low": 500,  "high": 2000, "points": 70},
+        {"label": "High profit  ($2K–$5K/mo)", "op": "between", "low": 2000, "high": 5000, "points": 90},
+        {"label": "Elite        (>$5K/mo)",    "op": "gte",     "threshold": 5000, "points": 100}
+      ]
+    },
+    "m_book": {
+      "label": "M-Book Profitability",
+      "description": "M-Book: Mixed logic. Internally held portion profits from client losses (B-Book style). Externally hedged portion earns spread/commission/swap (A-Book style). Internal ratio defaults to 60%.",
+      "formula_label": "0.6 × captured_losses + spread + commission + swap",
+      "internal_ratio": 0.6,
+      "bands": [
+        {"label": "Loss-making (<$0/mo)",      "op": "lt",      "threshold": 0,    "points": 0},
+        {"label": "Marginal   ($0–$75/mo)",    "op": "between", "low": 0,   "high": 75,   "points": 20},
+        {"label": "Low        ($75–$300/mo)",  "op": "between", "low": 75,  "high": 300,  "points": 45},
+        {"label": "Medium     ($300–$1K/mo)",  "op": "between", "low": 300, "high": 1000, "points": 70},
+        {"label": "High       (>$1K/mo)",      "op": "gte",     "threshold": 1000, "points": 100}
+      ]
+    }
+  }
+}

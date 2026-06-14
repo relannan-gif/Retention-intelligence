@@ -1,9 +1,10 @@
 # utils/scoring.py
-# Phase 2 — Complete brokerage intelligence scoring engine.
-# Six scores per client, book-type aware profitability, 3x3 segmentation matrix.
+# Phase 3 — Rules-engine-driven scoring for Risk, Value, and Profitability.
+# Reactivation, VIP Upside, and Health remain weight-based.
 
 import pandas as pd
 import numpy as np
+from utils import rules_engine as _re
 
 
 def _normalize(series: pd.Series) -> pd.Series:
@@ -440,16 +441,21 @@ def score_dataframe(df: pd.DataFrame,
                     prof_weights: dict,
                     react_weights: dict,
                     vip_weights: dict,
-                    thresholds: dict) -> pd.DataFrame:
+                    thresholds: dict,
+                    rules: dict = None) -> pd.DataFrame:
     """
     Enrich the raw client DataFrame with all 6 scores plus labels,
     segmentation, recommended action, and recommended owner.
+    Risk, Value, and Profitability are driven by the Business Rules Engine.
     """
+    if rules is None:
+        rules = _re.load_rules()
+
     df = df.copy()
 
-    df["retention_risk_score"]   = compute_retention_risk(df, risk_weights)
-    df["commercial_value_score"] = compute_commercial_value(df, value_weights)
-    df["profitability_score"]    = compute_profitability(df)
+    df["retention_risk_score"]   = _re.score_retention_risk(df, rules, risk_weights)
+    df["commercial_value_score"] = _re.score_commercial_value(df, rules, value_weights)
+    df["profitability_score"]    = _re.score_profitability(df, rules)
     df["reactivation_score"]     = compute_reactivation(df, react_weights)
     df["vip_upside_score"]       = compute_vip_upside(df, vip_weights)
     df["client_health_score"]    = compute_client_health(
