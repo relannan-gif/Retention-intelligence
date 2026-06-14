@@ -1,97 +1,101 @@
-# pages/4_Action_Center.py
-# Action Center — shows only clients that require an action right now.
+# pages/4_Action_Center.py  —  Profitability-first action queue with team owner assignment
 
 import streamlit as st
-import pandas as pd
 import plotly.express as px
-from utils.helpers import load_data, fmt_currency, page_header
+import plotly.graph_objects as go
 
 st.set_page_config(page_title="Action Center", page_icon="🚨", layout="wide")
 
-page_header("🚨 Action Center", "Clients requiring immediate commercial or retention action")
+from utils.helpers import (
+    apply_theme, load_data, fmt_currency, page_header,
+    GOLD, RED, GREEN, AMBER, BLUE, PURPLE, MUTED, PLOTLY_LAYOUT,
+)
+
+apply_theme()
+page_header("🚨 Action Center",
+            "Profitability-first · protect the most revenue today")
 
 df = load_data()
-thresholds = st.session_state["thresholds"]
+t  = st.session_state["thresholds"]
 
-# ── Filter to clients who need action ─────────────────────────────────────────
-# We exclude "Watch only" — those don't need active intervention.
-action_df = df[df["recommended_action"] != "Watch only"].copy()
-action_df = action_df.sort_values("priority_score", ascending=False)
+# Sort: profitability DESC, then value DESC, then risk DESC
+action_df = df[df["recommended_action"] != "Monitor Only"].copy()
+action_df = action_df.sort_values(
+    ["profitability_score", "commercial_value_score", "retention_risk_score"],
+    ascending=[False, False, False]
+)
 
-# ── Summary KPIs ──────────────────────────────────────────────────────────────
+# ── KPI Cards ─────────────────────────────────────────────────────────────────
 k1, k2, k3, k4 = st.columns(4)
-k1.metric("Clients Needing Action", len(action_df))
-k2.metric("Avg Priority Score",     f"{action_df['priority_score'].mean():.1f}")
-k3.metric("Equity at Stake",        fmt_currency(action_df["current_equity"].sum()))
-k4.metric("Revenue at Stake",       fmt_currency(action_df["spread_commission_revenue"].sum()))
+k1.metric("Clients Needing Action",    len(action_df))
+k2.metric("Avg Priority Score",        f"{action_df['priority_score'].mean():.1f}")
+k3.metric("Annual Revenue at Stake",
+          fmt_currency((action_df["spread_commission_revenue"] +
+                         action_df["commission_revenue"] +
+                         action_df["swap_revenue"]).sum() * 12))
+k4.metric("Annual Profitability at Stake",
+          fmt_currency(action_df["net_company_pnl"].sum() * 12))
 
 st.divider()
 
-# ── Filter by action type ──────────────────────────────────────────────────────
-all_actions   = sorted(action_df["recommended_action"].unique().tolist())
-action_filter = st.multiselect(
-    "Filter by recommended action (leave blank to show all)",
-    options=all_actions,
-    default=[],
-)
+# ── Filters ───────────────────────────────────────────────────────────────────
+fc1, fc2, fc3 = st.columns(3)
+with fc1:
+    all_actions = sorted(action_df["recommended_action"].unique())
+    sel_actions = st.multiselect("Filter by action", all_actions)
+with fc2:
+    all_owners = sorted(action_df["recommended_owner"].unique())
+    sel_owner  = st.selectbox("Filter by owner", ["All"] + all_owners)
+with fc3:
+    sel_prio   = st.selectbox("Priority level", ["All", "Critical", "Elevated", "Normal"])
 
-if action_filter:
-    action_df = action_df[action_df["recommended_action"].isin(action_filter)]
-
-# ── Priority level filter ──────────────────────────────────────────────────────
-prio_filter = st.selectbox(
-    "Filter by priority level",
-    ["All", "Critical", "Elevated", "Normal"],
-)
-if prio_filter != "All":
-    action_df = action_df[action_df["priority_level"] == prio_filter]
+if sel_actions:
+    action_df = action_df[action_df["recommended_action"].isin(sel_actions)]
+if sel_owner != "All":
+    action_df = action_df[action_df["recommended_owner"] == sel_owner]
+if sel_prio != "All":
+    action_df = action_df[action_df["priority_level"] == sel_prio]
 
 st.markdown(f"**{len(action_df)} clients** match the current filters.")
 
 st.divider()
 
 # ── Action breakdown chart ─────────────────────────────────────────────────────
-action_counts = (
-    action_df["recommended_action"]
-    .value_counts()
-    .reset_index()
-)
-action_counts.columns = ["action", "count"]
+ac1, ac2 = st.columns(2)
 
-fig_actions = px.bar(
-    action_counts,
-    x="count", y="action",
-    orientation="h",
-    color="count",
-    color_continuous_scale="Reds",
-    title="Clients by Recommended Action",
-    labels={"count": "Number of Clients", "action": "Action"},
-)
-fig_actions.update_layout(height=350, showlegend=False)
-st.plotly_chart(fig_actions, use_container_width=True)
+with ac1:
+    action_counts = action_df["recommended_action"].value_counts().reset_index()
+    action_counts.columns = ["action", "count"]
+    fig1 = px.bar(action_counts, x="count", y="action", orientation="h",
+                  color="count", color_continuous_scale="Reds",
+                  title="Clients by Recommended Action",
+                  labels={"count": "Clients", "action": ""})
+    fig1.update_layout(**PLOTLY_LAYOUT, height=320, showlegend=False,
+                       coloraxis_showscale=False)
+    st.plotly_chart(fig1, use_container_width=True)
+
+with ac2:
+    owner_counts = action_df["recommended_owner"].value_counts().reset_index()
+    owner_counts.columns = ["owner", "count"]
+    fig2 = px.pie(owner_counts, names="owner", values="count",
+                  title="Action Distribution by Recommended Owner",
+                  color_discrete_sequence=[GOLD, RED, GREEN, BLUE, PURPLE])
+    fig2.update_layout(**PLOTLY_LAYOUT, height=320)
+    st.plotly_chart(fig2, use_container_width=True)
 
 st.divider()
 
 # ── Action table ───────────────────────────────────────────────────────────────
-st.markdown("### Action List")
+st.markdown(f"<h4 style='color:{GOLD}'>Action List — Sorted by Profitability → Value → Risk</h4>",
+            unsafe_allow_html=True)
 
 display_cols = [
-    "client_id",
-    "client_name",
-    "country",
-    "account_manager",
-    "priority_score",
-    "retention_risk_score",
-    "client_value_score",
-    "priority_level",
-    "recommended_action",
-    "action_reason",
-    "current_equity",
-    "withdrawal_amount_last_30d",
-    "last_deposit_days_ago",
-    "login_days_ago",
-    "complaints_last_30d",
-    "open_tickets",
+    "client_id", "client_name", "country", "account_manager", "book_type",
+    "priority_score", "profitability_score", "retention_risk_score",
+    "commercial_value_score", "client_health_score",
+    "priority_level", "health_label", "segment",
+    "recommended_action", "recommended_owner", "action_reason",
+    "current_equity", "net_company_pnl", "vip_status",
 ]
 
 st.dataframe(
@@ -100,50 +104,72 @@ st.dataframe(
     hide_index=True,
     column_config={
         "priority_score": st.column_config.ProgressColumn(
-            "Priority", min_value=0, max_value=100, format="%.0f"
-        ),
+            "Priority", min_value=0, max_value=100, format="%.0f"),
+        "profitability_score": st.column_config.ProgressColumn(
+            "Profit Score", min_value=0, max_value=100, format="%.0f"),
         "retention_risk_score": st.column_config.ProgressColumn(
-            "Risk Score", min_value=0, max_value=100, format="%.0f"
-        ),
-        "client_value_score": st.column_config.ProgressColumn(
-            "Value Score", min_value=0, max_value=100, format="%.0f"
-        ),
-        "current_equity": st.column_config.NumberColumn(
-            "Equity ($)", format="$%.0f"
-        ),
-        "withdrawal_amount_last_30d": st.column_config.NumberColumn(
-            "Withdrawal 30d ($)", format="$%.0f"
-        ),
+            "Risk Score", min_value=0, max_value=100, format="%.0f"),
+        "commercial_value_score": st.column_config.ProgressColumn(
+            "Value Score", min_value=0, max_value=100, format="%.0f"),
+        "client_health_score": st.column_config.ProgressColumn(
+            "Health", min_value=0, max_value=100, format="%.0f"),
+        "current_equity": st.column_config.NumberColumn("Equity ($)", format="$%.0f"),
+        "net_company_pnl": st.column_config.NumberColumn("Monthly PnL ($)", format="$%.0f"),
+        "vip_status": st.column_config.CheckboxColumn("VIP"),
     },
 )
 
-# ── Per-action deep dives ──────────────────────────────────────────────────────
 st.divider()
-st.markdown("### Deep-Dive by Action Type")
-selected_action = st.selectbox("Pick an action type to analyse", all_actions)
 
-subset = action_df[action_df["recommended_action"] == selected_action]
+# ── Team-level view ────────────────────────────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Team Workload Summary</h4>",
+            unsafe_allow_html=True)
+
+team_summary = (
+    action_df.groupby("recommended_owner")
+    .agg(
+        clients=("client_id", "count"),
+        avg_priority=("priority_score", "mean"),
+        avg_profitability=("profitability_score", "mean"),
+        total_equity=("current_equity", "sum"),
+        annual_rev=("spread_commission_revenue", lambda x: x.sum() * 12),
+        annual_pnl=("net_company_pnl", lambda x: x.sum() * 12),
+    )
+    .sort_values("avg_priority", ascending=False)
+    .reset_index()
+)
+team_summary["avg_priority"]      = team_summary["avg_priority"].round(1)
+team_summary["avg_profitability"] = team_summary["avg_profitability"].round(1)
+team_summary["total_equity"]      = team_summary["total_equity"].apply(fmt_currency)
+team_summary["annual_rev"]        = team_summary["annual_rev"].apply(fmt_currency)
+team_summary["annual_pnl"]        = team_summary["annual_pnl"].apply(fmt_currency)
+team_summary.columns = [
+    "Owner Team", "Clients", "Avg Priority", "Avg Profitability",
+    "Total Equity", "Annual Revenue", "Annual PnL"
+]
+st.dataframe(team_summary, use_container_width=True, hide_index=True)
+
+st.divider()
+
+# ── Deep-dive by action ────────────────────────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Deep-Dive by Action Type</h4>",
+            unsafe_allow_html=True)
+sel_action = st.selectbox("Select action to analyse", sorted(df["recommended_action"].unique()))
+subset = action_df[action_df["recommended_action"] == sel_action]
 
 if len(subset) == 0:
     st.info("No clients with this action in the current filters.")
 else:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Clients", len(subset))
-        st.metric("Avg Risk",     f"{subset['retention_risk_score'].mean():.1f}")
-        st.metric("Avg Value",    f"{subset['client_value_score'].mean():.1f}")
-    with col2:
-        st.metric("Total Equity", fmt_currency(subset["current_equity"].sum()))
-        st.metric("Avg Equity",   fmt_currency(subset["current_equity"].mean()))
-        st.metric("Total Withdrawals 30d", fmt_currency(subset["withdrawal_amount_last_30d"].sum()))
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("Clients",          len(subset))
+    d2.metric("Avg Risk",         f"{subset['retention_risk_score'].mean():.1f}")
+    d3.metric("Avg Profitability",f"{subset['profitability_score'].mean():.1f}")
+    d4.metric("Total Equity",     fmt_currency(subset["current_equity"].sum()))
 
-    # Country breakdown for this action
     country_counts = subset["country"].value_counts().head(8).reset_index()
     country_counts.columns = ["country", "count"]
-    fig_c = px.bar(
-        country_counts, x="country", y="count",
-        title=f"Country breakdown — '{selected_action}'",
-        color_discrete_sequence=["#3498DB"],
-    )
-    fig_c.update_layout(height=280)
-    st.plotly_chart(fig_c, use_container_width=True)
+    fig3 = px.bar(country_counts, x="country", y="count",
+                  title=f"Country breakdown — '{sel_action}'",
+                  color_discrete_sequence=[GOLD])
+    fig3.update_layout(**PLOTLY_LAYOUT, height=260)
+    st.plotly_chart(fig3, use_container_width=True)

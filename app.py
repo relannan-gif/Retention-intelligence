@@ -1,10 +1,8 @@
-# app.py
-# Main entry point for the OneRoyal Client Intelligence Platform.
-# Run with: streamlit run app.py
+# app.py  —  OneRoyal Client Intelligence Platform  (Phase 2)
+# Run with:  streamlit run app.py
 
 import streamlit as st
 
-# --- Page config must be the FIRST Streamlit call ---
 st.set_page_config(
     page_title="OneRoyal Client Intelligence",
     page_icon="📊",
@@ -12,67 +10,97 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# --- Load data into session state on first run ---
-from utils.helpers import load_data, DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS, DEFAULT_THRESHOLDS
+from utils.helpers import (
+    apply_theme, load_data, refresh_data,
+    DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS, DEFAULT_PROF_WEIGHTS,
+    DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS, DEFAULT_THRESHOLDS,
+    fmt_currency, GOLD, RED, AMBER, GREEN,
+)
 
-if "risk_weights"  not in st.session_state:
-    st.session_state["risk_weights"]  = DEFAULT_RISK_WEIGHTS.copy()
-if "value_weights" not in st.session_state:
-    st.session_state["value_weights"] = DEFAULT_VALUE_WEIGHTS.copy()
-if "thresholds"    not in st.session_state:
-    st.session_state["thresholds"]    = DEFAULT_THRESHOLDS.copy()
-if "risk_blend"    not in st.session_state:
-    st.session_state["risk_blend"]    = 0.6
+apply_theme()
 
-# Trigger first data load
+# ── Initialise session state on first run ─────────────────────────────────────
+for key, default in [
+    ("risk_weights",  DEFAULT_RISK_WEIGHTS),
+    ("value_weights", DEFAULT_VALUE_WEIGHTS),
+    ("prof_weights",  DEFAULT_PROF_WEIGHTS),
+    ("react_weights", DEFAULT_REACT_WEIGHTS),
+    ("vip_weights",   DEFAULT_VIP_WEIGHTS),
+    ("thresholds",    DEFAULT_THRESHOLDS),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default.copy()
+
 load_data()
 
-# --- Sidebar branding ---
-st.sidebar.markdown("## 📊 OneRoyal")
-st.sidebar.markdown("**Client Intelligence Platform**")
-st.sidebar.divider()
-st.sidebar.markdown("Navigate using the pages in the sidebar.")
-st.sidebar.divider()
-
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 df = st.session_state["scored_df"]
-high_risk_threshold = st.session_state["thresholds"]["high_risk"]
-critical_priority   = st.session_state["thresholds"]["critical_priority"]
+t  = st.session_state["thresholds"]
 
-st.sidebar.metric("Total Clients",   len(df))
-st.sidebar.metric("High Risk",       int((df["retention_risk_score"] >= high_risk_threshold).sum()))
-st.sidebar.metric("Critical Priority", int((df["priority_score"] >= critical_priority).sum()))
+st.sidebar.markdown(
+    f"<h2 style='color:{GOLD}'>OneRoyal</h2>"
+    "<p style='color:#94A3B8;margin-top:-10px;font-size:13px'>"
+    "Client Intelligence Platform</p>",
+    unsafe_allow_html=True
+)
+st.sidebar.divider()
 
-# --- Home page content ---
-st.title("📊 OneRoyal Client Intelligence Platform")
+high_risk    = int((df["retention_risk_score"] >= t["high_risk"]).sum())
+critical     = int((df["priority_score"] >= t["critical_priority"]).sum())
+vip_at_risk  = int((df["vip_status"] & (df["retention_risk_score"] >= t["high_risk"])).sum())
+
+st.sidebar.metric("Total Clients",      len(df))
+st.sidebar.metric("Clients At Risk",    high_risk)
+st.sidebar.metric("Critical Priority",  critical)
+st.sidebar.metric("VIPs At Risk",       vip_at_risk)
+st.sidebar.divider()
+st.sidebar.caption("Navigate using the pages above.")
+
+# ── Home page ─────────────────────────────────────────────────────────────────
+st.markdown(
+    f"<h1 style='color:{GOLD};font-size:2rem'>📊 OneRoyal Client Intelligence Platform</h1>",
+    unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='color:#94A3B8'>Board-level brokerage intelligence · "
+    "A-Book · B-Book · M-Book · Phase 2</p>",
+    unsafe_allow_html=True
+)
+st.divider()
+
+# Six KPI cards
+k1, k2, k3, k4, k5, k6 = st.columns(6)
+
+equity_at_risk = df.loc[df["retention_risk_score"] >= t["high_risk"], "current_equity"].sum()
+high_val_at_risk = int(
+    ((df["retention_risk_score"] >= t["high_risk"]) &
+     (df["commercial_value_score"] >= t["high_value"])).sum()
+)
+
+annual_revenue_at_risk = (
+    df.loc[df["retention_risk_score"] >= t["high_risk"],
+           ["spread_commission_revenue", "commission_revenue", "swap_revenue"]]
+    .sum().sum() * 12
+)
+annual_profit_at_risk = (
+    df.loc[df["retention_risk_score"] >= t["high_risk"], "net_company_pnl"].sum() * 12
+)
+
+k1.metric("Total Clients",             len(df))
+k2.metric("Clients At Risk",           high_risk)
+k3.metric("High-Value At Risk",        high_val_at_risk)
+k4.metric("Equity At Risk",            fmt_currency(equity_at_risk))
+k5.metric("Annual Revenue At Risk",    fmt_currency(annual_revenue_at_risk))
+k6.metric("Annual Profitability At Risk", fmt_currency(annual_profit_at_risk))
+
+st.divider()
 st.markdown("""
-Welcome to the **OneRoyal Client Intelligence Platform** — your central hub for
-identifying at-risk clients, prioritising retention actions, and protecting revenue.
-
----
-
-### How to navigate
-Use the **sidebar** on the left to move between pages:
-
-| Page | What it does |
-|------|-------------|
-| **Executive Dashboard** | High-level KPIs and charts for leadership |
-| **Client List** | Full searchable/filterable client table |
-| **Scoring Engine** | Adjust scoring weights and see how scores change |
-| **Action Center** | Clients needing action right now |
-| **Settings** | Change risk/value/priority thresholds |
-
----
-
-### Quick summary
+| Page | Purpose |
+|------|---------|
+| **Executive Dashboard** | Board-level KPIs, geographic & AM analysis, segmentation matrix, trend analytics |
+| **Client List** | Full filterable client table with all 6 scores |
+| **Scoring Engine** | Adjust scoring weights · Understand book-type logic · Scatter analysis |
+| **Action Center** | Prioritised action queue — profitability-first · Team owner assignment |
+| **Settings** | Configure risk / value / profitability thresholds |
 """)
-
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Clients", len(df))
-col2.metric("High Risk Clients",
-            int((df["retention_risk_score"] >= high_risk_threshold).sum()))
-col3.metric("Critical Priority",
-            int((df["priority_score"] >= critical_priority).sum()))
-col4.metric("Avg Priority Score",
-            f"{df['priority_score'].mean():.1f}")
-
-st.info("💡 Start with the **Executive Dashboard** page to see the full overview.")
+st.info("💡 Start with **Executive Dashboard** or go directly to **Action Center** to see today's call list.")
