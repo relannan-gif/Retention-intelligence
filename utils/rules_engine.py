@@ -1,6 +1,8 @@
-# utils/rules_engine.py
+# utils/rules_engine.py — v2.0
 # Business Rules Engine — loads tiered scoring rules from config/scoring_rules.json,
 # applies them to compute factor scores, and exposes the config for UI editing.
+# Changes v2.0: VIP removed from commercial value. Both equity_erosion and equity_trend
+# signals now in retention risk. Corrected B-Book/M-Book profitability (no spread).
 
 import json, os
 import pandas as pd
@@ -56,7 +58,6 @@ def apply_band(value: float, bands: list) -> float:
             return float(band["points"])
         if op == "between" and band["low"] <= value < band["high"]:
             return float(band["points"])
-    # Fallback: return last band's points
     return float(bands[-1]["points"]) if bands else 50.0
 
 
@@ -66,18 +67,19 @@ def apply_band_series(series: pd.Series, bands: list) -> pd.Series:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Retention Risk — rules-based
+# Retention Risk — rules-based  (7 signals)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def score_retention_risk(df: pd.DataFrame, rules: dict, weights: dict) -> pd.Series:
     """
     Apply configured retention-risk rules to every client.
-    Each factor is scored 0-100 via band rules, then combined with weights.
-    Final score is re-normalized to span the full 0-100 range.
+    Seven signals: withdrawal pressure, volume drop, login inactivity,
+    deposit inactivity, complaints, equity erosion (vs deposits), equity trend (30d).
+    Each factor scored 0-100 via band rules, combined with weights, then re-normalized.
     """
     rr = rules["retention_risk"]
 
-    # ── Derived metrics ──────────────────────────────────────────────────────
+    # Derived metrics
     withdrawal_pct = (
         df["withdrawal_amount_last_30d"] / df["current_equity"].clip(lower=1) * 100
     )
@@ -85,25 +87,33 @@ def score_retention_risk(df: pd.DataFrame, rules: dict, weights: dict) -> pd.Ser
         (df["trading_volume_previous_30d"] - df["trading_volume_last_30d"])
         / df["trading_volume_previous_30d"].clip(lower=1) * 100
     ).clip(lower=0)
-    equity_decline_pct = (
+    complaints_total = df["complaints_last_30d"] + df["open_tickets"]
+
+    # Equity erosion vs net deposits (long-term capital destruction signal)
+    equity_erosion_pct = (
+        (1 - df["current_equity"] / df["net_deposits"].clip(lower=1)) * 100
+    ).clip(lower=0)
+
+    # Equity trend: short-term 30-day balance decline
+    equity_trend_pct = (
         (df["equity_30d_ago"] - df["current_equity"])
         / df["equity_30d_ago"].clip(lower=1) * 100
     ).clip(lower=0)
-    complaints_total = df["complaints_last_30d"] + df["open_tickets"]
 
-    # ── Apply bands ──────────────────────────────────────────────────────────
-    f_withdrawal = apply_band_series(withdrawal_pct,          rr["withdrawal_risk"]["bands"])
-    f_vol_drop   = apply_band_series(vol_drop_pct,            rr["volume_drop"]["bands"])
-    f_login      = apply_band_series(df["login_days_ago"],    rr["login_inactivity"]["bands"])
-    f_deposit    = apply_band_series(df["last_deposit_days_ago"], rr["deposit_inactivity"]["bands"])
-    f_complaints = apply_band_series(complaints_total,        rr["complaints"]["bands"])
-    f_equity     = apply_band_series(equity_decline_pct,      rr["equity_reduction"]["bands"])
+    # Apply bands
+    f_withdrawal = apply_band_series(withdrawal_pct,             rr["withdrawal_risk"]["bands"])
+    f_vol_drop   = apply_band_series(vol_drop_pct,               rr["volume_drop"]["bands"])
+    f_login      = apply_band_series(df["login_days_ago"],       rr["login_inactivity"]["bands"])
+    f_deposit    = apply_band_series(df["last_deposit_days_ago"],rr["deposit_inactivity"]["bands"])
+    f_complaints = apply_band_series(complaints_total,           rr["complaints"]["bands"])
+    f_erosion    = apply_band_series(equity_erosion_pct,         rr["equity_erosion"]["bands"])
+    f_trend      = apply_band_series(equity_trend_pct,           rr["equity_trend"]["bands"])
 
-    # ── Weighted combination ─────────────────────────────────────────────────
     w = weights
     total_w = (
         w["w_withdrawal"] + w["w_volume_drop"] + w["w_login"] +
-        w["w_deposit_stale"] + w["w_complaints"] + w["w_equity_erosion"]
+        w["w_deposit_stale"] + w["w_complaints"] +
+        w["w_equity_erosion"] + w["w_equity_trend"]
     ) or 1
 
     raw = (
@@ -112,19 +122,21 @@ def score_retention_risk(df: pd.DataFrame, rules: dict, weights: dict) -> pd.Ser
         f_login      * w["w_login"] +
         f_deposit    * w["w_deposit_stale"] +
         f_complaints * w["w_complaints"] +
-        f_equity     * w["w_equity_erosion"]
+        f_erosion    * w["w_equity_erosion"] +
+        f_trend      * w["w_equity_trend"]
     ) / total_w
 
     return _normalize(raw).round(1)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Commercial Value — rules-based
+# Commercial Value — rules-based  (6 signals, no VIP)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def score_commercial_value(df: pd.DataFrame, rules: dict, weights: dict) -> pd.Series:
     """
     Apply configured commercial-value rules to every client.
+    Six financial signals. No VIP status — value is measured by financial behaviour only.
     """
     cv = rules["commercial_value"]
 
@@ -134,13 +146,11 @@ def score_commercial_value(df: pd.DataFrame, rules: dict, weights: dict) -> pd.S
     f_volume     = apply_band_series(df["trading_volume_last_30d"],  cv["trading_volume"]["bands"])
     f_redeposits = apply_band_series(df["number_of_redeposits"],     cv["redeposit_count"]["bands"])
     f_tenure     = apply_band_series(df["client_tenure_days"],       cv["client_tenure"]["bands"])
-    # VIP flag: always max value for this factor
-    f_vip        = df["vip_status"].astype(float) * 100
 
     w = weights
     total_w = (
         w["v_lifetime_dep"] + w["v_net_dep"] + w["v_current_equity"] +
-        w["v_volume"] + w["v_redeposits"] + w["v_tenure"] + w["v_vip"]
+        w["v_volume"] + w["v_redeposits"] + w["v_tenure"]
     ) or 1
 
     raw = (
@@ -149,15 +159,14 @@ def score_commercial_value(df: pd.DataFrame, rules: dict, weights: dict) -> pd.S
         f_equity     * w["v_current_equity"] +
         f_volume     * w["v_volume"] +
         f_redeposits * w["v_redeposits"] +
-        f_tenure     * w["v_tenure"] +
-        f_vip        * w["v_vip"]
+        f_tenure     * w["v_tenure"]
     ) / total_w
 
     return _normalize(raw).round(1)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Profitability — book-type aware rules
+# Profitability — book-type aware rules  (corrected B-Book/M-Book formulas)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def score_profitability(df: pd.DataFrame, rules: dict) -> pd.Series:
@@ -165,38 +174,39 @@ def score_profitability(df: pd.DataFrame, rules: dict) -> pd.Series:
     Compute profitability amount per book type, apply book-specific bands,
     then normalize across all clients to produce a 0-100 score.
 
-    A-Book : spread + commission + swap
-    B-Book : captured_losses + commission + swap + spread
-    M-Book : internal_ratio × captured_losses + spread + commission + swap
+    A-Book: commission + swap + spread_commission_revenue
+            (all revenue is fee-based; spread IS a client-facing charge)
+    B-Book: captured_client_losses + commission + swap
+            (position P&L model; spread NOT included — B-Book earns from losses)
+    M-Book: internal_ratio × captured_client_losses + commission + swap
+            (partial position model; spread NOT included in internal P&L)
     """
     pr = rules["profitability"]
-    amounts = pd.Series(0.0, index=df.index)
+    amounts    = pd.Series(0.0, index=df.index)
     raw_scores = pd.Series(0.0, index=df.index)
 
     a_mask = df["book_type"] == "A-Book"
     b_mask = df["book_type"] == "B-Book"
     m_mask = df["book_type"] == "M-Book"
 
-    # A-Book profitability amount
+    # A-Book: fees only
     amounts[a_mask] = (
-        df.loc[a_mask, "spread_commission_revenue"] +
         df.loc[a_mask, "commission_revenue"] +
-        df.loc[a_mask, "swap_revenue"]
+        df.loc[a_mask, "swap_revenue"] +
+        df.loc[a_mask, "spread_commission_revenue"]
     )
 
-    # B-Book profitability amount (losses + all revenue streams)
+    # B-Book: position P&L + fees, no spread
     amounts[b_mask] = (
         df.loc[b_mask, "captured_client_losses"] +
         df.loc[b_mask, "commission_revenue"] +
-        df.loc[b_mask, "swap_revenue"] +
-        df.loc[b_mask, "spread_commission_revenue"]
+        df.loc[b_mask, "swap_revenue"]
     )
 
-    # M-Book profitability amount
+    # M-Book: partial position P&L + fees, no spread
     internal_ratio = pr["m_book"].get("internal_ratio", 0.6)
     amounts[m_mask] = (
         internal_ratio * df.loc[m_mask, "captured_client_losses"] +
-        df.loc[m_mask, "spread_commission_revenue"] +
         df.loc[m_mask, "commission_revenue"] +
         df.loc[m_mask, "swap_revenue"]
     )
@@ -206,7 +216,6 @@ def score_profitability(df: pd.DataFrame, rules: dict) -> pd.Series:
     raw_scores[b_mask] = apply_band_series(amounts[b_mask], pr["b_book"]["bands"])
     raw_scores[m_mask] = apply_band_series(amounts[m_mask], pr["m_book"]["bands"])
 
-    # Cross-book normalization so scores are comparable
     return _normalize(raw_scores).round(1)
 
 
@@ -224,7 +233,7 @@ def _normalize(series: pd.Series) -> pd.Series:
 def get_factor_breakdown(row: pd.Series, rules: dict) -> dict:
     """
     Return a dict of {factor_label: points_scored} for a single client.
-    Useful for the client detail view to show WHY a client scored a certain way.
+    Used in the Client Detail view to show WHY a client scored a certain way.
     """
     rr = rules["retention_risk"]
     cv = rules["commercial_value"]
@@ -232,7 +241,8 @@ def get_factor_breakdown(row: pd.Series, rules: dict) -> dict:
     withdrawal_pct   = (row["withdrawal_amount_last_30d"] / max(row["current_equity"], 1)) * 100
     vol_drop_pct     = max(0, (row["trading_volume_previous_30d"] - row["trading_volume_last_30d"])
                           / max(row["trading_volume_previous_30d"], 1) * 100)
-    equity_decline   = max(0, (row["equity_30d_ago"] - row["current_equity"])
+    equity_erosion   = max(0, (1 - row["current_equity"] / max(row["net_deposits"], 1)) * 100)
+    equity_trend     = max(0, (row["equity_30d_ago"] - row["current_equity"])
                           / max(row["equity_30d_ago"], 1) * 100)
     complaints_total = row["complaints_last_30d"] + row["open_tickets"]
 
@@ -243,7 +253,8 @@ def get_factor_breakdown(row: pd.Series, rules: dict) -> dict:
             rr["login_inactivity"]["label"]:   apply_band(row["login_days_ago"], rr["login_inactivity"]["bands"]),
             rr["deposit_inactivity"]["label"]: apply_band(row["last_deposit_days_ago"], rr["deposit_inactivity"]["bands"]),
             rr["complaints"]["label"]:         apply_band(complaints_total, rr["complaints"]["bands"]),
-            rr["equity_reduction"]["label"]:   apply_band(equity_decline, rr["equity_reduction"]["bands"]),
+            rr["equity_erosion"]["label"]:     apply_band(equity_erosion, rr["equity_erosion"]["bands"]),
+            rr["equity_trend"]["label"]:       apply_band(equity_trend, rr["equity_trend"]["bands"]),
         },
         "value_factors": {
             cv["lifetime_deposits"]["label"]:  apply_band(row["lifetime_deposits"],       cv["lifetime_deposits"]["bands"]),

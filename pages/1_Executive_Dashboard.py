@@ -236,7 +236,7 @@ seg_labels = {
     "Proactive Nurture":     (BLUE, "🔵"),
     "Standard Nurture":      ("#60A5FA", "🔵"),
     "Light Touch":           (MUTED, "⚪"),
-    "VIP Expansion":         (GREEN, "🟢"),
+    "High Value Growth":     (GREEN, "🟢"),
     "Growth Program":        ("#34D399", "🟢"),
     "Monitor":               (MUTED, "⚪"),
 }

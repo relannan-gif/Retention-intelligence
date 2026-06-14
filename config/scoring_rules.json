@@ -1,11 +1,11 @@
 {
-  "version": "1.0",
-  "description": "OneRoyal Client Intelligence — Business Scoring Rules. Edit thresholds and points here or via the Settings UI. All points on a 0-100 scale.",
+  "version": "2.0",
+  "description": "OneRoyal Client Intelligence — Business Scoring Rules v2.0. VIP concept removed. B-Book/M-Book profitability no longer includes spread revenue. Equity trend added as separate 7th risk signal. Edit via Settings → Business Rules Engine.",
 
   "retention_risk": {
     "withdrawal_risk": {
-      "label": "Withdrawal Risk",
-      "description": "Withdrawal amount as % of current equity in the last 30 days",
+      "label": "Withdrawal Pressure",
+      "description": "Withdrawal amount as % of current equity in the last 30 days. High withdrawals are the strongest churn signal.",
       "unit": "%",
       "bands": [
         {"label": "Minimal  (<10%)",      "op": "lt",      "threshold": 10,  "points": 10},
@@ -15,7 +15,7 @@
     },
     "volume_drop": {
       "label": "Trading Volume Drop",
-      "description": "% decline in trading volume vs previous 30-day period",
+      "description": "% decline in trading volume vs previous 30-day period. Volume reduction is an early warning signal before withdrawal.",
       "unit": "%",
       "bands": [
         {"label": "Stable or growing (≤0%)",   "op": "lte",     "threshold": 0,  "points": 5},
@@ -26,7 +26,7 @@
     },
     "login_inactivity": {
       "label": "Login Inactivity",
-      "description": "Days since the client last logged in",
+      "description": "Days since the client last logged in to the platform.",
       "unit": "days",
       "bands": [
         {"label": "Active        (<7d)",     "op": "lt",      "threshold": 7,  "points": 5},
@@ -37,7 +37,7 @@
     },
     "deposit_inactivity": {
       "label": "Deposit Inactivity",
-      "description": "Days since the client's last deposit",
+      "description": "Days since the client's last deposit. Long gaps indicate disengagement.",
       "unit": "days",
       "bands": [
         {"label": "Recent depositor     (<30d)",    "op": "lt",      "threshold": 30,  "points": 5},
@@ -48,7 +48,7 @@
     },
     "complaints": {
       "label": "Complaints & Open Tickets",
-      "description": "Total complaints (last 30d) + open tickets",
+      "description": "Total complaints (last 30d) + open support tickets. Unresolved service issues raise churn probability.",
       "unit": "count",
       "bands": [
         {"label": "No complaints (0)",    "op": "eq",      "threshold": 0,  "points": 0},
@@ -56,9 +56,20 @@
         {"label": "2+ complaints",        "op": "gte",     "threshold": 2,  "points": 90}
       ]
     },
-    "equity_reduction": {
-      "label": "Equity Reduction (30-day)",
-      "description": "% decline in current equity compared to 30 days ago",
+    "equity_erosion": {
+      "label": "Equity Erosion vs Deposits",
+      "description": "How much of the client's net lifetime deposits has been lost. Measures long-term capital destruction.",
+      "unit": "%",
+      "bands": [
+        {"label": "Healthy or growing (≤0%)", "op": "lte",     "threshold": 0,  "points": 0},
+        {"label": "Mild erosion    (0–20%)",  "op": "between", "low": 0,  "high": 20, "points": 25},
+        {"label": "Significant     (20–50%)", "op": "between", "low": 20, "high": 50, "points": 60},
+        {"label": "Severe          (>50%)",   "op": "gte",     "threshold": 50, "points": 90}
+      ]
+    },
+    "equity_trend": {
+      "label": "Equity Declining (30-Day)",
+      "description": "% decline in current equity compared to 30 days ago. Short-term capital flight indicator.",
       "unit": "%",
       "bands": [
         {"label": "Growing or stable (≤0%)", "op": "lte",     "threshold": 0,  "points": 0},
@@ -72,7 +83,7 @@
   "commercial_value": {
     "lifetime_deposits": {
       "label": "Lifetime Deposits",
-      "description": "Total USD deposited by the client since account opening",
+      "description": "Total USD deposited by the client since account opening. Strongest signal of overall relationship size.",
       "unit": "$",
       "bands": [
         {"label": "Micro  (<$1K)",           "op": "lt",      "threshold": 1000,   "points": 10},
@@ -84,7 +95,7 @@
     },
     "net_deposits": {
       "label": "Net Deposits",
-      "description": "Lifetime deposits minus total withdrawals ($)",
+      "description": "Lifetime deposits minus total withdrawals. Represents the client's committed capital to OneRoyal.",
       "unit": "$",
       "bands": [
         {"label": "Negative or zero (<$0)", "op": "lt",      "threshold": 0,    "points": 0},
@@ -96,7 +107,7 @@
     },
     "current_equity": {
       "label": "Current Equity",
-      "description": "Current account balance/equity ($)",
+      "description": "Current account balance. Higher equity = more capital at risk if client churns.",
       "unit": "$",
       "bands": [
         {"label": "Under  (<$500)",          "op": "lt",      "threshold": 500,   "points": 5},
@@ -108,7 +119,7 @@
     },
     "trading_volume": {
       "label": "Trading Volume (30-day)",
-      "description": "Total trading volume in last 30 days ($)",
+      "description": "Total trading volume in last 30 days. Active traders generate more fee revenue.",
       "unit": "$",
       "bands": [
         {"label": "Inactive (<$1K)",         "op": "lt",      "threshold": 1000,   "points": 5},
@@ -120,7 +131,7 @@
     },
     "redeposit_count": {
       "label": "Number of Redeposits",
-      "description": "How many times the client has topped up their account",
+      "description": "How many times the client has topped up their account. High redeposit count signals strong loyalty and long-term intent.",
       "unit": "count",
       "bands": [
         {"label": "First deposit only (0)",  "op": "eq",      "threshold": 0,  "points": 0},
@@ -132,7 +143,7 @@
     },
     "client_tenure": {
       "label": "Client Tenure",
-      "description": "Number of days since the client's first deposit",
+      "description": "Number of days since the client's first deposit. Long-term clients have proven commitment.",
       "unit": "days",
       "bands": [
         {"label": "New       (<90d)",        "op": "lt",      "threshold": 90,  "points": 10},
@@ -146,8 +157,8 @@
   "profitability": {
     "a_book": {
       "label": "A-Book Profitability",
-      "description": "A-Book: Spread revenue + Commission + Swap income. Client PnL is irrelevant (exposure hedged).",
-      "formula_label": "spread_revenue + commission + swap",
+      "description": "A-Book: All exposure is hedged externally. OneRoyal earns commission revenue + swap income only. Spread revenue is included as a fee component.",
+      "formula_label": "commission + swap + spread_revenue",
       "bands": [
         {"label": "Marginal (<$50/mo)",     "op": "lt",      "threshold": 50,   "points": 10},
         {"label": "Low      ($50–$200/mo)", "op": "between", "low": 50,   "high": 200,  "points": 35},
@@ -158,8 +169,8 @@
     },
     "b_book": {
       "label": "B-Book Profitability",
-      "description": "B-Book: Captured client losses + Commission revenue + Swap income + Spread. Client losses ARE the primary profit source.",
-      "formula_label": "captured_losses + commission + swap + spread",
+      "description": "B-Book: OneRoyal holds all client positions internally. Profitability comes from captured client losses + commission + swap. Spread revenue is NOT included — B-Book profit is position-based.",
+      "formula_label": "captured_client_losses + commission + swap",
       "bands": [
         {"label": "Loss-making  (<$0/mo)",     "op": "lt",      "threshold": 0,    "points": 0},
         {"label": "Marginal     ($0–$100/mo)", "op": "between", "low": 0,    "high": 100,  "points": 20},
@@ -171,8 +182,8 @@
     },
     "m_book": {
       "label": "M-Book Profitability",
-      "description": "M-Book: Mixed logic. Internally held portion profits from client losses (B-Book style). Externally hedged portion earns spread/commission/swap (A-Book style). Internal ratio defaults to 60%.",
-      "formula_label": "0.6 × captured_losses + spread + commission + swap",
+      "description": "M-Book: Mixed hedging model. The internally-held portion earns from client losses (B-Book style). Commission + swap are earned on all positions. Spread revenue is NOT included in P&L — it is a fee-side item. Internal ratio defaults to 60%.",
+      "formula_label": "(internal_ratio × captured_losses) + commission + swap",
       "internal_ratio": 0.6,
       "bands": [
         {"label": "Loss-making (<$0/mo)",      "op": "lt",      "threshold": 0,    "points": 0},

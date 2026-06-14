@@ -13,7 +13,7 @@ st.set_page_config(
 from utils.helpers import (
     apply_theme, load_data, refresh_data,
     DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS, DEFAULT_PROF_WEIGHTS,
-    DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS, DEFAULT_THRESHOLDS,
+    DEFAULT_REACT_WEIGHTS, DEFAULT_UPSIDE_WEIGHTS, DEFAULT_THRESHOLDS,
     fmt_currency, GOLD, RED, AMBER, GREEN,
 )
 
@@ -21,12 +21,12 @@ apply_theme()
 
 # ── Initialise session state on first run ─────────────────────────────────────
 for key, default in [
-    ("risk_weights",  DEFAULT_RISK_WEIGHTS),
-    ("value_weights", DEFAULT_VALUE_WEIGHTS),
-    ("prof_weights",  DEFAULT_PROF_WEIGHTS),
-    ("react_weights", DEFAULT_REACT_WEIGHTS),
-    ("vip_weights",   DEFAULT_VIP_WEIGHTS),
-    ("thresholds",    DEFAULT_THRESHOLDS),
+    ("risk_weights",   DEFAULT_RISK_WEIGHTS),
+    ("value_weights",  DEFAULT_VALUE_WEIGHTS),
+    ("prof_weights",   DEFAULT_PROF_WEIGHTS),
+    ("react_weights",  DEFAULT_REACT_WEIGHTS),
+    ("upside_weights", DEFAULT_UPSIDE_WEIGHTS),
+    ("thresholds",     DEFAULT_THRESHOLDS),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default.copy()
@@ -45,14 +45,17 @@ st.sidebar.markdown(
 )
 st.sidebar.divider()
 
-high_risk    = int((df["retention_risk_score"] >= t["high_risk"]).sum())
-critical     = int((df["priority_score"] >= t["critical_priority"]).sum())
-vip_at_risk  = int((df["vip_status"] & (df["retention_risk_score"] >= t["high_risk"])).sum())
+high_risk       = int((df["retention_risk_score"] >= t["high_risk"]).sum())
+critical        = int((df["priority_score"] >= t["critical_priority"]).sum())
+high_val_at_risk = int(
+    ((df["retention_risk_score"] >= t["high_risk"]) &
+     (df["commercial_value_score"] >= t["high_value"])).sum()
+)
 
-st.sidebar.metric("Total Clients",      len(df))
-st.sidebar.metric("Clients At Risk",    high_risk)
-st.sidebar.metric("Critical Priority",  critical)
-st.sidebar.metric("VIPs At Risk",       vip_at_risk)
+st.sidebar.metric("Total Clients",       len(df))
+st.sidebar.metric("Clients At Risk",     high_risk)
+st.sidebar.metric("Critical Priority",   critical)
+st.sidebar.metric("High-Value At Risk",  high_val_at_risk)
 st.sidebar.divider()
 st.sidebar.caption("Navigate using the pages above.")
 

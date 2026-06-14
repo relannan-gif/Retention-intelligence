@@ -11,9 +11,9 @@ from pathlib import Path
 DB_PATH = Path(__file__).parent.parent / "data" / "snapshots.db"
 
 OUTCOME_TYPES   = ["churn", "large_withdrawal", "full_withdrawal",
-                   "dormancy", "redeposit", "reactivation", "vip_upgrade"]
+                   "dormancy", "redeposit", "reactivation"]
 ACTION_TYPES    = ["Retention Call", "Cashback Offer", "Bonus Offer",
-                   "VIP Meeting", "Account Manager Follow-Up", "Email Campaign"]
+                   "Account Manager Follow-Up", "Email Campaign"]
 ACTION_OUTCOMES = ["success", "failure", "pending"]
 
 
@@ -36,12 +36,12 @@ def init_db():
             id                    INTEGER PRIMARY KEY AUTOINCREMENT,
             snapshot_date         DATE    NOT NULL,
             client_id             TEXT    NOT NULL,
-            retention_risk_score  REAL,
-            commercial_value_score REAL,
-            profitability_score   REAL,
-            reactivation_score    REAL,
-            vip_upside_score      REAL,
-            client_health_score   REAL,
+            retention_risk_score    REAL,
+            commercial_value_score  REAL,
+            profitability_score     REAL,
+            reactivation_score      REAL,
+            upside_potential_score  REAL,
+            client_health_score     REAL,
             priority_score        REAL,
             recommended_action    TEXT,
             recommended_owner     TEXT,
@@ -104,7 +104,7 @@ def save_snapshot(scored_df: pd.DataFrame, source: str = "sample"):
     today = str(datetime.date.today())
     snap_cols = [
         "client_id", "retention_risk_score", "commercial_value_score",
-        "profitability_score", "reactivation_score", "vip_upside_score",
+        "profitability_score", "reactivation_score", "upside_potential_score",
         "client_health_score", "priority_score",
         "recommended_action", "recommended_owner",
     ]
@@ -296,7 +296,7 @@ def seed_historical_data(scored_df: pd.DataFrame, months: int = 12):
 
     score_cols = [
         "retention_risk_score", "commercial_value_score", "profitability_score",
-        "reactivation_score",   "vip_upside_score",       "client_health_score",
+        "reactivation_score",   "upside_potential_score", "client_health_score",
         "priority_score",
     ]
 
@@ -381,7 +381,7 @@ def seed_historical_data(scored_df: pd.DataFrame, months: int = 12):
         # Seed retention actions (last 6 months, high-risk clients only)
         SUCCESS = {
             "Retention Call": 0.45, "Cashback Offer": 0.38,
-            "Bonus Offer": 0.32,    "VIP Meeting": 0.60,
+            "Bonus Offer": 0.32,
             "Account Manager Follow-Up": 0.25, "Email Campaign": 0.15,
         }
         high_risk = scored_df[scored_df["retention_risk_score"] >= 60].head(80)

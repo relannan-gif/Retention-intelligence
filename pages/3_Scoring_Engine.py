@@ -9,7 +9,7 @@ st.set_page_config(page_title="Scoring Engine", page_icon="⚙️", layout="wide
 from utils.helpers import (
     apply_theme, load_data, rescore, page_header,
     DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS,
-    DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS,
+    DEFAULT_REACT_WEIGHTS, DEFAULT_UPSIDE_WEIGHTS,
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, PLOTLY_LAYOUT,
     get_plotly_layout,
 )
@@ -43,8 +43,8 @@ complaints + tickets · equity erosion vs deposits · equity declining vs 30 day
 #### 2. Commercial Value Score
 > **Higher = more commercially important**
 
-7 signals: lifetime deposits · net deposits · current equity · trading volume ·
-redeposit count · client tenure · VIP status (counts heavily)
+6 financial signals: lifetime deposits · net deposits · current equity · trading volume ·
+redeposit count · client tenure. Value is measured by financial behaviour only — no account type classification.
 
 ---
 
@@ -53,9 +53,9 @@ redeposit count · client tenure · VIP status (counts heavily)
 
 | Book Type | How Profitability is Calculated |
 |-----------|--------------------------------|
-| **A-Book** | Spread revenue + Commission + Swap income |
-| **B-Book** | Captured client losses + Commission + Swap + Spread |
-| **M-Book** | (internal ratio) × captured losses + Spread + Commission + Swap |
+| **A-Book** | Spread revenue + Commission + Swap income (all fee-based) |
+| **B-Book** | Captured client losses + Commission + Swap (no spread — position P&L model) |
+| **M-Book** | (internal_ratio × captured losses) + Commission + Swap (no spread) |
 
 B-Book clients who are winning (costing the company money) will score LOW here.
 B-Book clients who are losing (profitable for OneRoyal) will score HIGH.
@@ -71,11 +71,12 @@ and had strong trading volume in the past.
 
 ---
 
-#### 5. VIP Upside Score
-> **Higher = untapped growth/upsell potential**
+#### 5. Upside Potential Score
+> **Higher = untapped growth potential**
 
-Scores highest for clients with high equity + growing volume + redeposit history
-who are **NOT yet VIP** (already-VIP clients get zero on the "not yet VIP" factor).
+Scores highest for clients with growing equity + growing volume trend + redeposit
+loyalty + long tenure. Based purely on financial behaviour — no account classification used.
+Factors: current equity size · net deposits · positive volume trend · redeposit count · tenure.
 
 ---
 
@@ -90,15 +91,15 @@ Labels: **Excellent** (80+) · **Healthy** (60–79) · **Watchlist** (40–59) 
 ---
 
 #### Priority Score (used to rank the Action Center)
-Formula: `Risk×30% + Value×25% + Profitability×30% + Reactivation×15%`
+Formula: `Risk×35% + Value×25% + Profitability×35% + Upside×5%`
 
 </div>
 """, unsafe_allow_html=True)
 
 # ── Tabs for each score group ─────────────────────────────────────────────────
-tab_rules, tab_risk, tab_val, tab_react, tab_vip, tab_dist = st.tabs([
+tab_rules, tab_risk, tab_val, tab_react, tab_upside, tab_dist = st.tabs([
     "Active Scoring Rules", "Risk Weights", "Value Weights", "Reactivation Weights",
-    "VIP Upside Weights", "Score Distributions",
+    "Upside Potential Weights", "Score Distributions",
 ])
 
 # ── Active Scoring Rules (read-only summary) ──────────────────────────────────
@@ -166,17 +167,22 @@ with tab_rules:
 with tab_risk:
     st.markdown(f"<h4 style='color:{GOLD}'>Retention Risk Weights</h4>",
                 unsafe_allow_html=True)
+    st.caption(
+        "Each weight controls the relative importance of a risk signal. "
+        "Higher weight = that signal has more influence on the final Retention Risk Score. "
+        "Weights are proportional — only the ratio between them matters, not the absolute values."
+    )
     rw = st.session_state["risk_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        rw["w_withdrawal"]     = st.slider("Withdrawal pressure",    0, 10, rw["w_withdrawal"])
-        rw["w_volume_drop"]    = st.slider("Volume drop",            0, 10, rw["w_volume_drop"])
-        rw["w_login"]          = st.slider("Login inactivity",       0, 10, rw["w_login"])
-        rw["w_equity_trend"]   = st.slider("Equity declining (30d)", 0, 10, rw["w_equity_trend"])
+        rw["w_withdrawal"]     = st.slider("Withdrawal pressure (strongest churn signal)",    0, 15, rw["w_withdrawal"])
+        rw["w_volume_drop"]    = st.slider("Volume drop (early warning — precedes withdrawal)",0, 15, rw["w_volume_drop"])
+        rw["w_login"]          = st.slider("Login inactivity (platform disengagement)",       0, 15, rw["w_login"])
+        rw["w_equity_trend"]   = st.slider("Equity declining 30-day (short-term capital flight)", 0, 15, rw["w_equity_trend"])
     with c2:
-        rw["w_deposit_stale"]  = st.slider("Deposit staleness",      0, 10, rw["w_deposit_stale"])
-        rw["w_complaints"]     = st.slider("Complaints + tickets",   0, 10, rw["w_complaints"])
-        rw["w_equity_erosion"] = st.slider("Equity erosion vs deposits", 0, 10, rw["w_equity_erosion"])
+        rw["w_deposit_stale"]  = st.slider("Deposit inactivity (no top-up signal)",          0, 15, rw["w_deposit_stale"])
+        rw["w_complaints"]     = st.slider("Complaints + tickets (service dissatisfaction)", 0, 15, rw["w_complaints"])
+        rw["w_equity_erosion"] = st.slider("Equity erosion vs net deposits (long-term P&L destruction)", 0, 15, rw["w_equity_erosion"])
 
     if st.button("Apply Risk Weights", type="primary", key="apply_risk"):
         st.session_state["risk_weights"] = rw
@@ -187,17 +193,21 @@ with tab_risk:
 with tab_val:
     st.markdown(f"<h4 style='color:{GOLD}'>Commercial Value Weights</h4>",
                 unsafe_allow_html=True)
+    st.caption(
+        "Controls what makes a client commercially important. "
+        "Value is based entirely on financial behaviour — not account type. "
+        "A higher weight means that factor contributes more to the Commercial Value Score."
+    )
     vw = st.session_state["value_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        vw["v_lifetime_dep"]   = st.slider("Lifetime deposits",  0, 10, vw["v_lifetime_dep"])
-        vw["v_net_dep"]        = st.slider("Net deposits",       0, 10, vw["v_net_dep"])
-        vw["v_current_equity"] = st.slider("Current equity",     0, 10, vw["v_current_equity"])
-        vw["v_vip"]            = st.slider("VIP status",         0, 10, vw["v_vip"])
+        vw["v_lifetime_dep"]   = st.slider("Lifetime deposits (total relationship size)",  0, 15, vw["v_lifetime_dep"])
+        vw["v_net_dep"]        = st.slider("Net deposits (committed capital)",             0, 15, vw["v_net_dep"])
+        vw["v_current_equity"] = st.slider("Current equity (capital at risk if churns)",  0, 15, vw["v_current_equity"])
     with c2:
-        vw["v_volume"]         = st.slider("Trading volume",     0, 10, vw["v_volume"])
-        vw["v_redeposits"]     = st.slider("Redeposit count",    0, 10, vw["v_redeposits"])
-        vw["v_tenure"]         = st.slider("Client tenure",      0, 10, vw["v_tenure"])
+        vw["v_volume"]         = st.slider("Trading volume 30d (active revenue generator)", 0, 15, vw["v_volume"])
+        vw["v_redeposits"]     = st.slider("Redeposit count (loyalty indicator)",          0, 15, vw["v_redeposits"])
+        vw["v_tenure"]         = st.slider("Client tenure (long-term commitment)",         0, 15, vw["v_tenure"])
 
     if st.button("Apply Value Weights", type="primary", key="apply_val"):
         st.session_state["value_weights"] = vw
@@ -208,7 +218,11 @@ with tab_val:
 with tab_react:
     st.markdown(f"<h4 style='color:{GOLD}'>Reactivation Weights</h4>",
                 unsafe_allow_html=True)
-    st.caption("Controls which dormant clients rank highest for win-back campaigns.")
+    st.caption(
+        "Controls which dormant or inactive clients rank highest for win-back campaigns. "
+        "The sweet spot is clients who were previously engaged (not brand new, not permanently lost) "
+        "and had strong enough financials to be worth re-engaging."
+    )
     rw2 = st.session_state["react_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
@@ -224,25 +238,29 @@ with tab_react:
         rescore()
         st.success("Reactivation weights updated.")
 
-# ── VIP upside weights ────────────────────────────────────────────────────────
-with tab_vip:
-    st.markdown(f"<h4 style='color:{GOLD}'>VIP Upside Weights</h4>",
+# ── Upside Potential weights ──────────────────────────────────────────────────
+with tab_upside:
+    st.markdown(f"<h4 style='color:{GOLD}'>Upside Potential Weights</h4>",
                 unsafe_allow_html=True)
-    st.caption("Controls which non-VIP clients rank highest for upsell.")
-    uw = st.session_state["vip_weights"].copy()
+    st.caption(
+        "Controls which clients rank highest for growth and upsell opportunities. "
+        "Upside is based entirely on financial behaviour — equity size, deposit commitment, "
+        "volume growth, loyalty, and tenure. No account type classification is used."
+    )
+    uw = st.session_state["upside_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        uw["u_equity"]       = st.slider("Current equity size",    0, 10, uw["u_equity"])
-        uw["u_net_dep"]      = st.slider("Net deposits",           0, 10, uw["u_net_dep"])
-        uw["u_volume_trend"] = st.slider("Positive volume trend",  0, 10, uw["u_volume_trend"])
+        uw["u_equity"]       = st.slider("Current equity size (capital base)", 0, 15, uw["u_equity"])
+        uw["u_net_dep"]      = st.slider("Net deposits (committed capital)",   0, 15, uw["u_net_dep"])
+        uw["u_volume_trend"] = st.slider("Positive volume trend (growing trader)", 0, 15, uw["u_volume_trend"])
     with c2:
-        uw["u_redeposits"]   = st.slider("Redeposit loyalty",      0, 10, uw["u_redeposits"])
-        uw["u_not_yet_vip"]  = st.slider("Not yet VIP (potential)", 0, 10, uw["u_not_yet_vip"])
+        uw["u_redeposits"]   = st.slider("Redeposit loyalty (repeat depositor)", 0, 15, uw["u_redeposits"])
+        uw["u_tenure"]       = st.slider("Client tenure (long-term relationship)", 0, 15, uw["u_tenure"])
 
-    if st.button("Apply VIP Upside Weights", type="primary", key="apply_vip"):
-        st.session_state["vip_weights"] = uw
+    if st.button("Apply Upside Potential Weights", type="primary", key="apply_upside"):
+        st.session_state["upside_weights"] = uw
         rescore()
-        st.success("VIP upside weights updated.")
+        st.success("Upside Potential weights updated.")
 
 # ── Score distributions ───────────────────────────────────────────────────────
 with tab_dist:
@@ -250,12 +268,12 @@ with tab_dist:
                 unsafe_allow_html=True)
 
     scores = [
-        ("retention_risk_score",   "Retention Risk",   RED),
-        ("commercial_value_score", "Commercial Value", BLUE),
-        ("profitability_score",    "Profitability",    GREEN),
-        ("reactivation_score",     "Reactivation",     AMBER),
-        ("vip_upside_score",       "VIP Upside",       PURPLE),
-        ("client_health_score",    "Client Health",    GOLD),
+        ("retention_risk_score",   "Retention Risk",     RED),
+        ("commercial_value_score", "Commercial Value",   BLUE),
+        ("profitability_score",    "Profitability",      GREEN),
+        ("reactivation_score",     "Reactivation",       AMBER),
+        ("upside_potential_score", "Upside Potential",   PURPLE),
+        ("client_health_score",    "Client Health",      GOLD),
     ]
 
     for i in range(0, 6, 2):

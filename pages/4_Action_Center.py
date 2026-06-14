@@ -98,7 +98,7 @@ display_cols = [
     "commercial_value_score", "client_health_score",
     "priority_level", "health_label", "segment",
     "recommended_action", "recommended_owner", "action_reason",
-    "current_equity", "net_company_pnl", "vip_status",
+    "current_equity", "net_company_pnl",
 ]
 
 st.dataframe(
@@ -118,7 +118,6 @@ st.dataframe(
             "Health", min_value=0, max_value=100, format="%.0f"),
         "current_equity": st.column_config.NumberColumn("Equity ($)", format="$%.0f"),
         "net_company_pnl": st.column_config.NumberColumn("Monthly PnL ($)", format="$%.0f"),
-        "vip_status": st.column_config.CheckboxColumn("VIP"),
     },
 )
 

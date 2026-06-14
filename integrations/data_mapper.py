@@ -85,27 +85,6 @@ def _dates_to_days_ago(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _normalise_vip(df: pd.DataFrame) -> pd.DataFrame:
-    """Normalise vip_status to a Python bool regardless of source format."""
-    if "vip_status" not in df.columns:
-        df["vip_status"] = False
-        return df
-
-    def _to_bool(val):
-        if pd.isna(val):
-            return False
-        if isinstance(val, bool):
-            return val
-        if isinstance(val, (int, float)):
-            return bool(val)
-        if isinstance(val, str):
-            return val.strip().lower() in {"yes", "true", "1"}
-        return False
-
-    df["vip_status"] = df["vip_status"].apply(_to_bool)
-    return df
-
-
 def _derive_account_status(login_days: pd.Series) -> pd.Series:
     """Categorise clients as Active / Dormant / Inactive based on login recency."""
     conditions = [
@@ -131,11 +110,10 @@ def map_upload(df: pd.DataFrame) -> pd.DataFrame:
       3. Rename upload columns to internal names
       4. Convert date columns to days-ago integers
       5. Convert client_tenure_months -> client_tenure_days (×30)
-      6. Normalise vip_status to bool
-      7. Fill missing columns with defaults
-      8. Coerce numeric columns
-      9. Derive missing derived columns
-      10. Return mapped DataFrame
+      6. Fill missing columns with defaults
+      7. Coerce numeric columns
+      8. Derive missing derived columns
+      9. Return mapped DataFrame
     """
     # 1. Deep copy
     df = df.copy(deep=True)
@@ -156,10 +134,7 @@ def map_upload(df: pd.DataFrame) -> pd.DataFrame:
         ).fillna(0) * 30
         df.drop(columns=["client_tenure_months"], inplace=True)
 
-    # 6. Normalise vip_status
-    df = _normalise_vip(df)
-
-    # 7. Fill missing optional columns with defaults
+    # 6. Fill missing optional columns with defaults
     for col, default_val in _DEFAULTS.items():
         if col not in df.columns:
             df[col] = default_val

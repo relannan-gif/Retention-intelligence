@@ -10,7 +10,7 @@ def init_session_state():
     """
     from utils.helpers import (
         DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS, DEFAULT_PROF_WEIGHTS,
-        DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS, DEFAULT_THRESHOLDS,
+        DEFAULT_REACT_WEIGHTS, DEFAULT_UPSIDE_WEIGHTS, DEFAULT_THRESHOLDS,
     )
 
     defaults = {
@@ -20,7 +20,7 @@ def init_session_state():
         "value_weights":    DEFAULT_VALUE_WEIGHTS.copy(),
         "prof_weights":     DEFAULT_PROF_WEIGHTS.copy(),
         "react_weights":    DEFAULT_REACT_WEIGHTS.copy(),
-        "vip_weights":      DEFAULT_VIP_WEIGHTS.copy(),
+        "upside_weights":   DEFAULT_UPSIDE_WEIGHTS.copy(),
         "data_source":      "sample",
         "data_filename":    None,
         "refresh_interval": "manual",

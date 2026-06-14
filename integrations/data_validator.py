@@ -46,7 +46,6 @@ INTERNAL_REQUIRED_COLUMNS: List[str] = [
     "net_company_pnl",
     "company_pnl_from_client",
     "client_tenure_days",
-    "vip_status",
     "total_deposits_count",
     "account_status",
 ]

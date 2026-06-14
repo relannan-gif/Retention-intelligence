@@ -7,7 +7,7 @@ st.set_page_config(page_title="Settings", page_icon="⚙️", layout="wide")
 from utils.helpers import (
     apply_theme, load_data, rescore, page_header, fmt_currency,
     DEFAULT_RISK_WEIGHTS, DEFAULT_VALUE_WEIGHTS, DEFAULT_PROF_WEIGHTS,
-    DEFAULT_REACT_WEIGHTS, DEFAULT_VIP_WEIGHTS, DEFAULT_THRESHOLDS,
+    DEFAULT_REACT_WEIGHTS, DEFAULT_UPSIDE_WEIGHTS, DEFAULT_THRESHOLDS,
     GOLD, RED, GREEN, AMBER, BLUE,
 )
 from utils.session_init import init_session_state
@@ -42,45 +42,84 @@ st.divider()
 
 # ── Scoring thresholds ────────────────────────────────────────────────────────
 st.markdown(f"<h4 style='color:{GOLD}'>Scoring Thresholds</h4>", unsafe_allow_html=True)
-st.caption("These determine when a client is labelled High Risk, High Value, High Profitability, or Critical Priority.")
+st.caption(
+    "Thresholds convert continuous 0–100 scores into actionable labels. "
+    "All scores are min-max normalised across the current client portfolio — "
+    "a score of 60 means the client is in the top 40% of the portfolio for that dimension. "
+    "Raise a threshold to focus only on the most extreme cases; lower it to cast a wider net."
+)
 
 tc1, tc2, tc3, tc4 = st.columns(4)
 with tc1:
     t["high_risk"] = st.slider(
         "High Risk threshold", 10, 95, int(t["high_risk"]),
-        help="Clients with risk score above this are labelled 'High Risk'.")
+        help=(
+            "Clients above this threshold are labelled 'High Risk' and appear in the Action Center. "
+            "Default: 60. At this level, roughly the top 40% of the portfolio by risk score are flagged. "
+            "Raise to 70–75 if the action queue is too large for your team to handle."
+        ))
 with tc2:
     t["high_value"] = st.slider(
         "High Value threshold", 10, 95, int(t["high_value"]),
-        help="Clients with value score above this are labelled 'High Value'.")
+        help=(
+            "Clients above this threshold are labelled 'High Value' and receive priority actions. "
+            "Default: 60. Commercial value is based on lifetime deposits, equity, volume, and tenure. "
+            "Lowering this threshold expands the protected portfolio; raising it tightens focus on top clients."
+        ))
 with tc3:
     t["high_profitability"] = st.slider(
         "High Profitability threshold", 10, 95, int(t.get("high_profitability", 60)),
-        help="Clients with profitability score above this trigger higher-priority actions.")
+        help=(
+            "Clients above this threshold are treated as high-profitability for action prioritisation. "
+            "Profitability is book-type aware: A-Book uses fees only; B/M-Book uses captured losses + fees. "
+            "Default: 60. These clients are sorted to the top of the Action Center."
+        ))
 with tc4:
     t["critical_priority"] = st.slider(
         "Critical Priority threshold", 10, 95, int(t["critical_priority"]),
-        help="Clients with priority score above this are labelled 'Critical'.")
+        help=(
+            "Clients above this Priority Score threshold are labelled 'Critical Priority'. "
+            "Priority = Risk×35% + Value×25% + Profitability×35% + Upside×5%. "
+            "Default: 65. These clients should receive same-day intervention."
+        ))
 
 st.divider()
 
 # ── Activity thresholds ────────────────────────────────────────────────────────
 st.markdown(f"<h4 style='color:{GOLD}'>Activity Thresholds</h4>", unsafe_allow_html=True)
+st.caption(
+    "Activity thresholds define the boundary conditions used in the risk scoring bands and action rules. "
+    "These complement the scoring weights — the bands in the Business Rules Engine use absolute thresholds, "
+    "while these settings drive the action logic and labelling."
+)
 
 ac1, ac2, ac3 = st.columns(3)
 with ac1:
     t["login_inactivity_days"] = st.slider(
         "Login inactivity (days)", 7, 180, int(t["login_inactivity_days"]),
-        help="Client is considered inactive if no login for this many days.")
+        help=(
+            "Clients who haven't logged in for this many days or more are flagged as inactive in action rules. "
+            "Default: 30 days. This also controls the Reactivation Score — "
+            "the sweet spot for reactivation is clients inactive 30–180 days."
+        ))
 with ac2:
     t["large_withdrawal_pct"] = st.slider(
         "Large withdrawal % of equity", 0.05, 0.80,
         float(t["large_withdrawal_pct"]), step=0.05, format="%.0f%%",
-        help="A withdrawal exceeding this % of equity triggers a withdrawal alert action.")
+        help=(
+            "A withdrawal exceeding this percentage of current equity triggers a 'Withdrawal Alert' action. "
+            "Default: 30%. Set lower (e.g. 20%) for high-value clients where smaller withdrawals matter. "
+            "The scoring engine always measures withdrawal pressure as a continuous % — this threshold "
+            "is used only in the action rule tree."
+        ))
 with ac3:
     t["dormant_days"] = st.slider(
         "Dormant client threshold (days)", 7, 90, int(t.get("dormant_days", 30)),
-        help="Clients who haven't logged in for longer than this are marked Dormant.")
+        help=(
+            "Clients with no login for this many days are classified as 'Dormant' in the account_status field. "
+            "Default: 30 days. Dormant clients with a high Reactivation Score are escalated to the "
+            "'Reactivation Call' action in the Action Center."
+        ))
 
 st.divider()
 
@@ -94,12 +133,12 @@ with sc1:
 with sc2:
     if st.button("Reset All Settings to Defaults"):
         for key, val in [
-            ("thresholds",    DEFAULT_THRESHOLDS),
-            ("risk_weights",  DEFAULT_RISK_WEIGHTS),
-            ("value_weights", DEFAULT_VALUE_WEIGHTS),
-            ("prof_weights",  DEFAULT_PROF_WEIGHTS),
-            ("react_weights", DEFAULT_REACT_WEIGHTS),
-            ("vip_weights",   DEFAULT_VIP_WEIGHTS),
+            ("thresholds",     DEFAULT_THRESHOLDS),
+            ("risk_weights",   DEFAULT_RISK_WEIGHTS),
+            ("value_weights",  DEFAULT_VALUE_WEIGHTS),
+            ("prof_weights",   DEFAULT_PROF_WEIGHTS),
+            ("react_weights",  DEFAULT_REACT_WEIGHTS),
+            ("upside_weights", DEFAULT_UPSIDE_WEIGHTS),
         ]:
             st.session_state[key] = val.copy()
         rescore()

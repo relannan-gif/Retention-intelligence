@@ -352,10 +352,10 @@ with tab2:
 with tab3:
     st.markdown("### Retention Action Effectiveness")
 
-    ACTION_TYPES    = ["VIP Meeting","Retention Call","Cashback Offer",
+    ACTION_TYPES    = ["Retention Call","Cashback Offer",
                        "Bonus Offer","Account Manager Follow-Up","Email Campaign"]
-    SIM_ATTEMPTS    = [18, 95, 67, 54, 142, 210]
-    SIM_RATES       = [0.60, 0.45, 0.38, 0.32, 0.25, 0.15]
+    SIM_ATTEMPTS    = [95, 67, 54, 142, 210]
+    SIM_RATES       = [0.45, 0.38, 0.32, 0.25, 0.15]
 
     if has_actions and not actions_df.empty and "action_type" in actions_df.columns:
         action_summary = []

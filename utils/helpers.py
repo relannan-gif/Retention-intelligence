@@ -1,5 +1,8 @@
-# utils/helpers.py
+# utils/helpers.py — v2.0
 # Shared utilities, default weights/thresholds, theme CSS, and data loader.
+# Changes v2.0: VIP removed from value weights. DEFAULT_VIP_WEIGHTS renamed to
+# DEFAULT_UPSIDE_WEIGHTS with updated keys. Risk weights recalibrated per spec.
+# B-Book/M-Book profitability formulas corrected (no spread). Priority 35/25/35/5.
 
 import streamlit as st
 import pandas as pd
@@ -10,20 +13,29 @@ from config.theme import THEMES, GOLD, RED, GREEN, AMBER, BLUE, PURPLE
 # ── Default weights ───────────────────────────────────────────────────────────
 
 DEFAULT_RISK_WEIGHTS = {
-    "w_withdrawal": 8, "w_volume_drop": 7, "w_login": 6,
-    "w_deposit_stale": 5, "w_complaints": 9,
-    "w_equity_erosion": 5, "w_equity_trend": 6,
+    "w_withdrawal":    12,   # Withdrawal pressure — strongest churn signal
+    "w_volume_drop":   10,   # Volume decline — earliest warning sign
+    "w_login":          6,   # Login inactivity
+    "w_deposit_stale":  5,   # Deposit inactivity
+    "w_complaints":     5,   # Complaints — important but should not dominate
+    "w_equity_erosion": 5,   # Long-term equity erosion vs net deposits
+    "w_equity_trend":   6,   # Short-term 30-day equity decline
 }
 
 DEFAULT_VALUE_WEIGHTS = {
-    "v_lifetime_dep": 8, "v_net_dep": 7, "v_current_equity": 8,
-    "v_volume": 6, "v_redeposits": 5, "v_tenure": 4, "v_vip": 9,
+    "v_lifetime_dep":   10,  # Lifetime deposits — highest weight
+    "v_net_dep":         8,  # Net deposits (committed capital)
+    "v_current_equity": 10,  # Current equity — equally highest weight
+    "v_volume":          6,  # Trading volume
+    "v_redeposits":      6,  # Redeposit loyalty
+    "v_tenure":          5,  # Client tenure
+    # No VIP weight — account type has no scoring impact
 }
 
 DEFAULT_PROF_WEIGHTS = {
-    "a_spread": 8, "a_commission": 7, "a_swap": 5,
-    "b_captured_losses": 10, "b_spread": 4,
-    "m_captured_losses": 7, "m_spread": 5, "m_commission": 5, "m_swap": 4,
+    "a_commission": 8, "a_swap": 7, "a_spread": 5,
+    "b_captured_losses": 10, "b_commission": 5, "b_swap": 4,
+    "m_captured_losses": 7, "m_commission": 5, "m_swap": 4,
 }
 
 DEFAULT_REACT_WEIGHTS = {
@@ -31,9 +43,13 @@ DEFAULT_REACT_WEIGHTS = {
     "r_redeposits": 6, "r_volume_hist": 7, "r_tenure": 5,
 }
 
-DEFAULT_VIP_WEIGHTS = {
-    "u_equity": 8, "u_net_dep": 6,
-    "u_volume_trend": 7, "u_redeposits": 5, "u_not_yet_vip": 9,
+DEFAULT_UPSIDE_WEIGHTS = {
+    "u_equity":       8,   # Current equity size
+    "u_net_dep":      6,   # Net deposits (committed capital)
+    "u_volume_trend": 7,   # Positive trading volume trend
+    "u_redeposits":   5,   # Redeposit loyalty
+    "u_tenure":       4,   # Long-term client relationship
+    # No VIP factor — upside is based on financial behaviour only
 }
 
 DEFAULT_THRESHOLDS = {
@@ -47,10 +63,6 @@ DEFAULT_THRESHOLDS = {
 }
 
 # ── Dark-theme backward-compat constants ──────────────────────────────────────
-# Semantic colors are always the same. Background/card/text colors below are
-# dark-theme defaults kept for backward compatibility.
-# Use get_colors() for theme-aware rendering.
-
 _DARK  = THEMES["dark"]
 BG     = _DARK["bg"]
 CARD   = _DARK["card"]
@@ -70,11 +82,7 @@ PLOTLY_LAYOUT = dict(
 # ── Theme-aware helpers ───────────────────────────────────────────────────────
 
 def get_colors() -> dict:
-    """
-    Return the current theme's color palette. Call at render time, not import time.
-    Keys: bg, card, secondary_bg, sidebar_bg, plot_bg, text, muted, border, input_bg,
-          plus semantic: gold, red, green, amber, blue, purple.
-    """
+    """Return the current theme's color palette. Call at render time, not import time."""
     theme_key = st.session_state.get("theme", "dark")
     t = THEMES.get(theme_key, THEMES["dark"])
     return {
@@ -85,10 +93,7 @@ def get_colors() -> dict:
 
 
 def get_plotly_layout(**overrides) -> dict:
-    """
-    Return a theme-aware Plotly layout dict. Keyword overrides replace defaults.
-    Use instead of **PLOTLY_LAYOUT so charts adapt to Dark and Light themes.
-    """
+    """Return a theme-aware Plotly layout dict. Keyword overrides replace defaults."""
     c = get_colors()
     base = dict(
         paper_bgcolor=c["bg"],
@@ -184,7 +189,7 @@ def load_data() -> pd.DataFrame:
 
 
 def refresh_data():
-    """Regenerate fake data and recompute all scores."""
+    """Regenerate sample data and recompute all scores."""
     raw = generate_clients(300)
     st.session_state["raw_df"] = raw
     _rescore_from_raw(raw)
@@ -208,12 +213,12 @@ def _rescore_from_raw(raw: pd.DataFrame):
         st.session_state["scoring_rules"] = load_rules()
     scored = score_dataframe(
         raw,
-        st.session_state.get("risk_weights",  DEFAULT_RISK_WEIGHTS),
-        st.session_state.get("value_weights", DEFAULT_VALUE_WEIGHTS),
-        st.session_state.get("prof_weights",  DEFAULT_PROF_WEIGHTS),
-        st.session_state.get("react_weights", DEFAULT_REACT_WEIGHTS),
-        st.session_state.get("vip_weights",   DEFAULT_VIP_WEIGHTS),
-        st.session_state.get("thresholds",    DEFAULT_THRESHOLDS),
+        st.session_state.get("risk_weights",    DEFAULT_RISK_WEIGHTS),
+        st.session_state.get("value_weights",   DEFAULT_VALUE_WEIGHTS),
+        st.session_state.get("prof_weights",    DEFAULT_PROF_WEIGHTS),
+        st.session_state.get("react_weights",   DEFAULT_REACT_WEIGHTS),
+        st.session_state.get("upside_weights",  DEFAULT_UPSIDE_WEIGHTS),
+        st.session_state.get("thresholds",      DEFAULT_THRESHOLDS),
         rules=st.session_state["scoring_rules"],
     )
     st.session_state["scored_df"] = scored
@@ -223,7 +228,7 @@ def _rescore_from_raw(raw: pd.DataFrame):
         save_snapshot(scored, source=source)
         log_refresh(source, len(scored), "success", round(time.time() - t0, 2))
     except Exception:
-        pass  # never let DB errors break the UI
+        pass
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────

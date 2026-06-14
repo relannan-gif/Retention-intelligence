@@ -213,66 +213,80 @@ with tab_upload:
         # Column guide
         st.markdown(f"<h5 style='color:{GOLD}'>Expected Column Names</h5>",
                     unsafe_allow_html=True)
-        guide_data = {
-            "Column Name":       [
-                "client_id", "client_name", "country", "account_manager",
-                "ib_name", "account_type", "book_type",
-                "lifetime_deposits", "net_deposits", "current_equity",
-                "last_login_date", "last_deposit_date", "last_withdrawal_date",
-                "withdrawals_30d", "deposits_30d",
-                "trading_volume_30d", "trading_volume_previous_30d",
-                "commission_revenue", "spread_revenue", "swap_revenue",
-                "company_pnl", "complaints", "open_tickets",
-                "client_tenure_months", "vip_status",
-            ],
-            "Required": [
-                "✅","✅","✅","⬜","⬜","⬜","✅",
-                "✅","⬜","✅",
-                "✅","✅","⬜",
-                "⬜","⬜","✅","⬜",
-                "⬜","⬜","⬜",
-                "⬜","⬜","⬜","⬜","⬜",
+        st.markdown(f"<h5 style='color:{GOLD}'>Required Fields</h5>", unsafe_allow_html=True)
+        st.caption("These columns must be present. Missing required columns block dataset activation.")
+        required_data = {
+            "Column Name": [
+                "client_id", "client_name", "country", "book_type",
+                "lifetime_deposits", "current_equity",
+                "last_login_date", "last_deposit_date", "trading_volume_30d",
             ],
             "Description": [
-                "Unique client identifier",
+                "Unique client identifier (string, e.g. CR10001)",
                 "Full client name",
                 "Country of residence",
-                "Assigned account manager name",
-                "Introducing broker name (leave blank if none)",
-                "Account type: Standard/ECN/VIP/Islamic/Pro/Micro",
-                "Book type: A-Book / B-Book / M-Book",
+                "Book type: A-Book / B-Book / M-Book (controls profitability formula)",
                 "Total deposits since account opened ($)",
-                "Lifetime deposits minus total withdrawals ($)",
                 "Current account balance ($)",
-                "Date of last login (YYYY-MM-DD)",
-                "Date of last deposit (YYYY-MM-DD)",
-                "Date of last withdrawal (YYYY-MM-DD)",
-                "Withdrawal amount in last 30 days ($)",
-                "Deposit amount in last 30 days ($)",
+                "Date of last login (YYYY-MM-DD format)",
+                "Date of last deposit (YYYY-MM-DD format)",
                 "Trading volume in last 30 days ($)",
-                "Trading volume in prior 30-day period ($)",
-                "Commission revenue from client ($)",
-                "Spread revenue from client ($)",
-                "Swap revenue from client ($)",
-                "Company PnL from this client ($)",
-                "Number of complaints in last 30 days",
-                "Number of open support tickets",
-                "Client tenure in months",
-                "VIP status: True/False or 1/0",
             ],
         }
-        st.dataframe(pd.DataFrame(guide_data), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(required_data), hide_index=True, use_container_width=True)
+
+        st.markdown(f"<h5 style='color:{GOLD}'>Recommended Fields</h5>", unsafe_allow_html=True)
+        st.caption("These fields significantly improve scoring accuracy. Include if available.")
+        recommended_data = {
+            "Column Name": [
+                "net_deposits", "trading_volume_previous_30d", "last_withdrawal_date",
+                "withdrawals_30d", "commission_revenue", "spread_revenue",
+                "swap_revenue", "captured_client_losses", "complaints", "open_tickets",
+                "client_tenure_months",
+            ],
+            "Description": [
+                "Lifetime deposits minus total withdrawals ($) — used in equity erosion signal",
+                "Trading volume in prior 30-day period ($) — enables volume drop signal",
+                "Date of last withdrawal (YYYY-MM-DD) — enables withdrawal timing signal",
+                "Withdrawal amount in last 30 days ($) — strongest churn signal",
+                "Commission revenue from client ($/month)",
+                "Spread revenue from client ($/month) — used in A-Book profitability only",
+                "Swap revenue from client ($/month) — used in all book types",
+                "Captured client losses ($/month) — used in B-Book and M-Book profitability",
+                "Number of complaints in last 30 days",
+                "Number of open support tickets",
+                "Client tenure in months (converted to days internally)",
+            ],
+        }
+        st.dataframe(pd.DataFrame(recommended_data), hide_index=True, use_container_width=True)
+
+        st.markdown(f"<h5 style='color:{GOLD}'>Optional Fields</h5>", unsafe_allow_html=True)
+        st.caption("These add context and filtering capability but do not affect scoring.")
+        optional_data = {
+            "Column Name": [
+                "account_manager", "ib_name", "account_type", "company_pnl", "deposits_30d",
+            ],
+            "Description": [
+                "Assigned account manager name (enables AM-level filtering and reporting)",
+                "Introducing broker name (enables IB-level filtering)",
+                "Account type: Classic / Prime / Islamic (informational only — not used in scoring)",
+                "Company PnL from this client ($ — alternative to individual revenue fields)",
+                "Deposit amount in last 30 days ($)",
+            ],
+        }
+        st.dataframe(pd.DataFrame(optional_data), hide_index=True, use_container_width=True)
 
         # Download template
-        template_df = pd.DataFrame(columns=guide_data["Column Name"])
+        all_cols = (required_data["Column Name"] + recommended_data["Column Name"] +
+                    optional_data["Column Name"])
+        template_df = pd.DataFrame(columns=all_cols)
         template_df.loc[0] = [
-            "CR10001", "John Smith", "UAE", "Sarah Johnson",
-            "Gulf Traders IB", "Standard", "B-Book",
-            "25000", "18000", "16500",
-            "2026-06-01", "2026-05-15", "2026-04-20",
-            "2000", "0", "120000", "95000",
-            "24", "80", "35",
-            "1200", "0", "1", "18", "False",
+            "CR10001", "John Smith", "UAE", "B-Book",
+            "25000", "16500",
+            "2026-06-01", "2026-05-15", "120000",
+            "18000", "95000", "2026-04-20",
+            "2000", "24", "80", "0", "35", "500", "0", "1", "18",
+            "Sarah Johnson", "Gulf Traders IB", "Prime", "1200", "0",
         ]
         buf = io.BytesIO()
         template_df.to_excel(buf, index=False, engine="openpyxl")

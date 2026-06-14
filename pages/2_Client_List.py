@@ -58,7 +58,7 @@ if sel_health  != "All":   filtered = filtered[filtered["health_label"] == sel_h
 
 sort_col = st.selectbox("Sort by", [
     "priority_score", "retention_risk_score", "commercial_value_score",
-    "profitability_score", "reactivation_score", "vip_upside_score",
+    "profitability_score", "reactivation_score", "upside_potential_score",
     "client_health_score", "current_equity", "lifetime_deposits",
 ])
 sort_asc = st.checkbox("Sort ascending", False)
@@ -80,9 +80,9 @@ if len(filtered) > 0:
 # ── Table ─────────────────────────────────────────────────────────────────────
 display_cols = [
     "client_id", "client_name", "country", "account_manager",
-    "book_type", "account_type", "vip_status", "health_label",
+    "book_type", "account_type", "health_label",
     "retention_risk_score", "commercial_value_score", "profitability_score",
-    "reactivation_score", "vip_upside_score", "client_health_score", "priority_score",
+    "reactivation_score", "upside_potential_score", "client_health_score", "priority_score",
     "segment", "recommended_action", "recommended_owner",
     "current_equity", "net_company_pnl",
 ]
@@ -100,15 +100,14 @@ st.dataframe(
             "Profitability", min_value=0, max_value=100, format="%.0f"),
         "reactivation_score": st.column_config.ProgressColumn(
             "Reactivation", min_value=0, max_value=100, format="%.0f"),
-        "vip_upside_score": st.column_config.ProgressColumn(
-            "VIP Upside", min_value=0, max_value=100, format="%.0f"),
+        "upside_potential_score": st.column_config.ProgressColumn(
+            "Upside Potential", min_value=0, max_value=100, format="%.0f"),
         "client_health_score": st.column_config.ProgressColumn(
             "Health", min_value=0, max_value=100, format="%.0f"),
         "priority_score": st.column_config.ProgressColumn(
             "Priority", min_value=0, max_value=100, format="%.0f"),
         "current_equity": st.column_config.NumberColumn("Equity ($)", format="$%.0f"),
         "net_company_pnl": st.column_config.NumberColumn("Monthly PnL ($)", format="$%.0f"),
-        "vip_status": st.column_config.CheckboxColumn("VIP"),
     },
 )
 
@@ -127,7 +126,7 @@ else:
     c2.metric("Value Score",        f"{row['commercial_value_score']:.0f}/100")
     c3.metric("Profitability",      f"{row['profitability_score']:.0f}/100")
     c4.metric("Reactivation",       f"{row['reactivation_score']:.0f}/100")
-    c5.metric("VIP Upside",         f"{row['vip_upside_score']:.0f}/100")
+    c5.metric("Upside Potential",   f"{row['upside_potential_score']:.0f}/100")
     c6.metric("Health Score",       f"{row['client_health_score']:.0f}/100")
 
     st.markdown(
@@ -142,12 +141,12 @@ else:
         st.markdown("**Financial summary**")
         st.write({
             "Book Type":        row["book_type"],
+            "Account Type":     row["account_type"],
             "Current Equity":   fmt_currency(row["current_equity"]),
             "Lifetime Deposits": fmt_currency(row["lifetime_deposits"]),
             "Net Deposits":     fmt_currency(row["net_deposits"]),
             "Monthly PnL":      fmt_currency(row["net_company_pnl"]),
             "Account Status":   row["account_status"],
-            "VIP Status":       "Yes" if row["vip_status"] else "No",
             "Tenure (days)":    int(row["client_tenure_days"]),
         })
     with d2:

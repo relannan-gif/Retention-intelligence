@@ -36,7 +36,7 @@ IB_NAMES = [
     "SunriseFX IB", "No IB",
 ]
 
-ACCOUNT_TYPES = ["Standard", "ECN", "VIP", "Islamic", "Pro", "Micro"]
+ACCOUNT_TYPES = ["Classic", "Prime", "Islamic"]
 BOOK_TYPES = ["A-Book", "B-Book", "M-Book"]
 
 
@@ -167,28 +167,25 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             captured_client_losses = 0.0
 
         # net_company_pnl: Book-aware total
+        # A-Book: all fee-based (spread IS a client-facing charge)
+        # B-Book: position P&L model — spread not included
+        # M-Book: partial position P&L model — spread not included
         if book_type == "A-Book":
             net_company_pnl = round(
                 spread_commission_revenue + commission_revenue + swap_revenue, 2
             )
         elif book_type == "B-Book":
             net_company_pnl = round(
-                captured_client_losses + commission_revenue + swap_revenue
-                + spread_commission_revenue, 2
+                captured_client_losses + commission_revenue + swap_revenue, 2
             )
         else:  # M-Book
             net_company_pnl = round(
-                0.6 * captured_client_losses + spread_commission_revenue
-                + commission_revenue + swap_revenue, 2
+                0.6 * captured_client_losses + commission_revenue + swap_revenue, 2
             )
 
         # client_tenure_days: int, lognormal to get range 30-1825 days
         raw_tenure = np.random.lognormal(mean=6.0, sigma=0.8)
         client_tenure_days = int(np.clip(raw_tenure, 30, 1825))
-
-        # vip_status: bool. 8% base chance, 20% if lifetime_deposits > 50000
-        vip_chance = 0.20 if lifetime_deposits > 50000 else 0.08
-        vip_status = bool(np.random.random() < vip_chance)
 
         # total_deposits_count: number_of_redeposits + 1 (or random 1-25)
         total_deposits_count = number_of_redeposits + 1
@@ -236,7 +233,6 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             "captured_client_losses": captured_client_losses,
             "net_company_pnl": net_company_pnl,
             "client_tenure_days": client_tenure_days,
-            "vip_status": vip_status,
             "total_deposits_count": total_deposits_count,
             "equity_30d_ago": equity_30d_ago,
             "volume_90d_ago": volume_90d_ago,
