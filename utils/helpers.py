@@ -167,10 +167,13 @@ def rescore():
 
 
 def _rescore_from_raw(raw: pd.DataFrame):
+    import time
+    t0 = time.time()
     from utils.rules_engine import load_rules
+    from utils.snapshot_db import init_db, save_snapshot, log_refresh
     if "scoring_rules" not in st.session_state:
         st.session_state["scoring_rules"] = load_rules()
-    st.session_state["scored_df"] = score_dataframe(
+    scored = score_dataframe(
         raw,
         st.session_state.get("risk_weights",  DEFAULT_RISK_WEIGHTS),
         st.session_state.get("value_weights", DEFAULT_VALUE_WEIGHTS),
@@ -180,6 +183,15 @@ def _rescore_from_raw(raw: pd.DataFrame):
         st.session_state.get("thresholds",    DEFAULT_THRESHOLDS),
         rules=st.session_state["scoring_rules"],
     )
+    st.session_state["scored_df"] = scored
+    # Persist snapshot + refresh log
+    try:
+        init_db()
+        source = st.session_state.get("data_source", "sample")
+        save_snapshot(scored, source=source)
+        log_refresh(source, len(scored), "success", round(time.time() - t0, 2))
+    except Exception:
+        pass  # never let DB errors break the UI
 
 
 # ── Formatting helpers ────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ st.set_page_config(page_title="Client List", page_icon="👥", layout="wide")
 
 from utils.helpers import (
     apply_theme, load_data, fmt_currency, page_header,
-    GOLD, RED, GREEN, AMBER, BLUE, MUTED,
+    GOLD, RED, GREEN, AMBER, BLUE, MUTED, PLOTLY_LAYOUT,
 )
 
 apply_theme()
@@ -159,3 +159,49 @@ else:
             "Complaints (30d)": int(row["complaints_last_30d"]),
             "Open Tickets":     int(row["open_tickets"]),
         })
+
+    # ── Score Contribution Breakdown ─────────────────────────────────────────
+    import plotly.graph_objects as go
+    from utils.rules_engine import get_factor_breakdown, load_rules
+
+    st.divider()
+    st.markdown(f"<h5 style='color:{GOLD}'>Score Contribution Analysis — why did this client score this way?</h5>",
+                unsafe_allow_html=True)
+    st.caption("Each bar shows the raw band score (0–100) for that factor. "
+               "The final score is a weighted combination of these signals.")
+
+    rules   = st.session_state.get("scoring_rules") or load_rules()
+    breakdown = get_factor_breakdown(row, rules)
+    rf = breakdown["risk_factors"]
+    vf = breakdown["value_factors"]
+
+    bc1, bc2 = st.columns(2)
+    with bc1:
+        fig_rf = go.Figure(go.Bar(
+            x=list(rf.values()), y=list(rf.keys()),
+            orientation="h", marker_color=RED, opacity=0.80,
+            text=[f"{v:.0f}" for v in rf.values()], textposition="outside",
+        ))
+        fig_rf.update_layout(
+            **PLOTLY_LAYOUT, height=260,
+            title=dict(text=f"Risk Factors  (score = {row['retention_risk_score']:.0f})",
+                       font=dict(color=RED, size=12)),
+            xaxis=dict(range=[0,105], title="Band Score (0–100)"),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_rf, use_container_width=True)
+
+    with bc2:
+        fig_vf = go.Figure(go.Bar(
+            x=list(vf.values()), y=list(vf.keys()),
+            orientation="h", marker_color=BLUE, opacity=0.80,
+            text=[f"{v:.0f}" for v in vf.values()], textposition="outside",
+        ))
+        fig_vf.update_layout(
+            **PLOTLY_LAYOUT, height=260,
+            title=dict(text=f"Value Factors  (score = {row['commercial_value_score']:.0f})",
+                       font=dict(color=BLUE, size=12)),
+            xaxis=dict(range=[0,105], title="Band Score (0–100)"),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_vf, use_container_width=True)

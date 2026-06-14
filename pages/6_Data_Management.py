@@ -553,60 +553,122 @@ with qd_col:
 
 st.divider()
 
+# ── Integration Configuration (Persistent) ────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Integration Configuration</h4>",
+            unsafe_allow_html=True)
+st.caption("Save your CRM and Holistics credentials. Stored in the local SQLite database — never sent anywhere.")
+
+from utils.snapshot_db import init_db, save_config, get_config, get_refresh_log, snapshot_summary
+init_db()
+
+cfg_tab_crm, cfg_tab_hol = st.tabs(["CRM API Settings", "Holistics Settings"])
+
+with cfg_tab_crm:
+    ic1, ic2 = st.columns(2)
+    with ic1:
+        saved_crm_url = get_config("crm_base_url")
+        saved_crm_key = get_config("crm_api_key")
+        new_crm_url = st.text_input("CRM Base URL", value=saved_crm_url,
+                                     placeholder="https://crm.example.com/api/v1",
+                                     key="cfg_crm_url")
+        new_crm_key = st.text_input("CRM API Key", value=saved_crm_key,
+                                     type="password", placeholder="sk-xxxx…",
+                                     key="cfg_crm_key")
+    with ic2:
+        saved_crm_user = get_config("crm_username")
+        new_crm_user   = st.text_input("CRM Username (OAuth)", value=saved_crm_user,
+                                        placeholder="admin@company.com", key="cfg_crm_user")
+        crm_auth_method = st.selectbox("Auth Method", ["API Key", "OAuth 2.0"],
+                                        key="cfg_crm_auth")
+        crm_status = "🟢 Connected" if get_config("crm_last_sync") else "🔴 Not Connected"
+        st.caption(f"**Status:** {crm_status}")
+        if get_config("crm_last_sync"):
+            st.caption(f"**Last Sync:** {get_config('crm_last_sync')}")
+
+    if st.button("Save CRM Configuration", key="save_crm_cfg"):
+        if new_crm_url:  save_config("crm_base_url",  new_crm_url)
+        if new_crm_key:  save_config("crm_api_key",   new_crm_key)
+        if new_crm_user: save_config("crm_username",  new_crm_user)
+        save_config("crm_auth_method", crm_auth_method)
+        st.success("CRM configuration saved to local database.")
+
+with cfg_tab_hol:
+    ih1, ih2 = st.columns(2)
+    with ih1:
+        saved_h_url = get_config("holistics_base_url")
+        saved_h_key = get_config("holistics_api_key")
+        new_h_url = st.text_input("Holistics Base URL", value=saved_h_url,
+                                   placeholder="https://app.holistics.io/api/v2",
+                                   key="cfg_h_url")
+        new_h_key = st.text_input("Holistics API Key", value=saved_h_key,
+                                   type="password", placeholder="holistics-key…",
+                                   key="cfg_h_key")
+    with ih2:
+        saved_h_ds  = get_config("holistics_dataset_id")
+        new_h_ds    = st.text_input("Dataset ID", value=saved_h_ds,
+                                     placeholder="12345", key="cfg_h_ds")
+        hol_status  = "🟢 Connected" if get_config("holistics_last_sync") else "🔴 Not Connected"
+        st.caption(f"**Status:** {hol_status}")
+        if get_config("holistics_last_sync"):
+            st.caption(f"**Last Sync:** {get_config('holistics_last_sync')}")
+
+    if st.button("Save Holistics Configuration", key="save_hol_cfg"):
+        if new_h_url: save_config("holistics_base_url",   new_h_url)
+        if new_h_key: save_config("holistics_api_key",    new_h_key)
+        if new_h_ds:  save_config("holistics_dataset_id", new_h_ds)
+        st.success("Holistics configuration saved to local database.")
+
+st.divider()
+
+# ── Refresh Log ───────────────────────────────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Refresh History</h4>", unsafe_allow_html=True)
+refresh_log = get_refresh_log(limit=10)
+if not refresh_log.empty:
+    refresh_log["status_icon"] = refresh_log["status"].map(
+        {"success": "✅", "failed": "❌"}).fillna("⚠️")
+    display_log = refresh_log[["refresh_time","status_icon","data_source",
+                               "records_processed","duration_seconds"]].copy()
+    display_log.columns = ["Refresh Time","Status","Source","Records","Duration (s)"]
+    st.dataframe(display_log, hide_index=True, use_container_width=True)
+else:
+    st.info("No refresh history yet. Activate a data source to record the first refresh.")
+
+st.divider()
+
+# ── Snapshot Database Status ──────────────────────────────────────────────────
+st.markdown(f"<h4 style='color:{GOLD}'>Snapshot Database Status</h4>", unsafe_allow_html=True)
+snap_summary = snapshot_summary()
+sn1, sn2, sn3, sn4 = st.columns(4)
+sn1.metric("Total Snapshots",  f"{snap_summary['total_snapshots']:,}")
+sn2.metric("Unique Dates",     snap_summary['unique_dates'])
+sn3.metric("Oldest Snapshot",  snap_summary['oldest_date'] or "None")
+sn4.metric("Latest Snapshot",  snap_summary['latest_date'] or "None")
+
+st.caption("Location: `data/snapshots.db`  ·  Format: SQLite  ·  Never overwrites — complete audit trail.")
+
+st.divider()
+
 # ── Integration Architecture Summary ──────────────────────────────────────────
-with st.expander("📐 Integration Architecture & File Structure", expanded=False):
-    st.markdown(f"""
-<div style='color:#E8E8E8'>
-
-## How the Data Pipeline Works
-
+with st.expander("Integration Architecture & File Structure", expanded=False):
+    st.markdown("""
+**Pipeline:**
 ```
-Any Data Source
-    ↓
-integrations/crm_connector.py      →  fetch_all() → dict
-integrations/holistics_connector.py →  fetch_all() → DataFrame
-pages/6_Data_Management.py          →  file_uploader → DataFrame
-data/sample_data.py                 →  generate_clients() → DataFrame
-    ↓
-integrations/data_mapper.py
-    map_upload()  /  map_crm_response()  /  map_holistics_response()
-    ↓  Column rename + date conversion + derived fields
-Unified Internal Schema (same columns regardless of source)
-    ↓
-integrations/data_validator.py
-    validate_internal()  →  quality score + issue report
-    ↓
-utils/data_manager.py
-    _activate_dataframe()  →  stores in session_state["raw_df"]
-    ↓
-utils/helpers.py → rescore()
-    ↓
-utils/rules_engine.py
-    score_retention_risk / score_commercial_value / score_profitability
-    ↓
-utils/scoring.py → score_dataframe()
-    ↓  All 6 scores + labels + actions
-session_state["scored_df"]
-    ↓
-All pages read from scored_df → dashboards refresh automatically
+Holistics/CRM/Upload/Sample
+    → data_mapper.map_upload()        (column rename + date conversion)
+    → integrations.data_validator     (quality score)
+    → utils.data_manager              (session state activation)
+    → utils.helpers.rescore()         (scoring engine)
+    → utils.rules_engine              (band rules → 6 scores)
+    → utils.snapshot_db.save_snapshot (SQLite snapshot)
+    → session_state["scored_df"]      (all dashboards read from here)
 ```
-
-## Integration Files
 
 | File | Purpose |
 |------|---------|
-| `integrations/crm_connector.py` | REST API connector for CRM systems |
-| `integrations/holistics_connector.py` | Holistics dataset export connector |
-| `integrations/data_mapper.py` | Column mapping + derived field computation |
-| `integrations/data_validator.py` | Data quality checks + quality score |
-| `utils/data_manager.py` | Source switching, refresh scheduling, activation |
-
-## To Activate Live CRM or Holistics
-
-1. Set environment variables: `CRM_BASE_URL`, `CRM_API_KEY` (or `HOLISTICS_*`)
-2. Implement the `get_*()` methods in the connector class
-3. Configure the refresh schedule to "Daily"
-4. The scoring engine, dashboards, and Action Center update automatically
-
-</div>
-""", unsafe_allow_html=True)
+| `integrations/crm_connector.py` | REST API connector |
+| `integrations/holistics_connector.py` | Holistics dataset export |
+| `integrations/data_mapper.py` | Column mapping + derived fields |
+| `integrations/data_validator.py` | Quality checks |
+| `utils/data_manager.py` | Source switching + scheduling |
+| `utils/snapshot_db.py` | SQLite snapshot + outcome storage |
+    """)
