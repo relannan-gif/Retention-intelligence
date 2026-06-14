@@ -110,7 +110,100 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             trading_volume_last_30d * np.random.uniform(0.0001, 0.0008), 2
         )
 
+        # --- NEW FIELDS: Book-type aware revenue ---
+        # swap_revenue: A-Book gets lognormal based on equity, B-Book=0, M-Book=smaller amount
+        if book_type == "A-Book":
+            swap_revenue = round(max(0, np.random.lognormal(
+                mean=np.log(max(current_equity * 0.002, 0.01)), sigma=0.5
+            )), 2)
+        elif book_type == "B-Book":
+            swap_revenue = 0.0
+        else:  # M-Book
+            swap_revenue = round(max(0, np.random.lognormal(
+                mean=np.log(max(current_equity * 0.001, 0.01)), sigma=0.5
+            )), 2)
+
+        # commission_revenue: A-Book volume * 0.0001-0.0005, B-Book=0, M-Book=small
+        if book_type == "A-Book":
+            commission_revenue = round(
+                trading_volume_last_30d * np.random.uniform(0.0001, 0.0005), 2
+            )
+        elif book_type == "B-Book":
+            commission_revenue = 0.0
+        else:  # M-Book
+            commission_revenue = round(
+                trading_volume_last_30d * np.random.uniform(0.00005, 0.0002), 2
+            )
+
+        # captured_client_losses: B-Book/M-Book only
+        # 75% of B-Book clients lose money (positive = profit for company)
+        # 25% win (negative = cost to company)
+        if book_type == "B-Book":
+            if np.random.random() < 0.75:
+                # Client loses — positive captured losses
+                captured_client_losses = round(
+                    current_equity * np.random.uniform(0.01, 0.15), 2
+                )
+            else:
+                # Client wins — negative (cost to company)
+                captured_client_losses = round(
+                    -current_equity * np.random.uniform(0.005, 0.08), 2
+                )
+        elif book_type == "M-Book":
+            # M-Book: 60% of B-Book amount
+            if np.random.random() < 0.75:
+                captured_client_losses = round(
+                    current_equity * np.random.uniform(0.006, 0.09), 2
+                )
+            else:
+                captured_client_losses = round(
+                    -current_equity * np.random.uniform(0.003, 0.048), 2
+                )
+        else:  # A-Book
+            captured_client_losses = 0.0
+
+        # net_company_pnl: Book-aware total
+        if book_type == "A-Book":
+            net_company_pnl = round(
+                spread_commission_revenue + commission_revenue + swap_revenue, 2
+            )
+        elif book_type == "B-Book":
+            net_company_pnl = round(
+                captured_client_losses + spread_commission_revenue, 2
+            )
+        else:  # M-Book
+            net_company_pnl = round(
+                0.6 * captured_client_losses + spread_commission_revenue
+                + commission_revenue + swap_revenue, 2
+            )
+
+        # client_tenure_days: int, lognormal to get range 30-1825 days
+        raw_tenure = np.random.lognormal(mean=6.0, sigma=0.8)
+        client_tenure_days = int(np.clip(raw_tenure, 30, 1825))
+
+        # vip_status: bool. 8% base chance, 20% if lifetime_deposits > 50000
+        vip_chance = 0.20 if lifetime_deposits > 50000 else 0.08
+        vip_status = bool(np.random.random() < vip_chance)
+
+        # total_deposits_count: number_of_redeposits + 1 (or random 1-25)
+        total_deposits_count = number_of_redeposits + 1
+
+        # equity_30d_ago: current_equity * uniform(0.85, 1.25)
+        equity_30d_ago = round(current_equity * np.random.uniform(0.85, 1.25), 2)
+
+        # volume_90d_ago: trading_volume_last_30d * uniform(0.4, 2.2)
+        volume_90d_ago = round(trading_volume_last_30d * np.random.uniform(0.4, 2.2), 2)
+
+        # account_status: Active/Dormant/Inactive based on login_days_ago
+        if login_days_ago < 30:
+            account_status = "Active"
+        elif login_days_ago <= 90:
+            account_status = "Dormant"
+        else:
+            account_status = "Inactive"
+
         records.append({
+            # Original fields
             "client_id": client_id,
             "client_name": client_name,
             "country": country,
@@ -132,6 +225,17 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             "open_tickets": open_tickets,
             "company_pnl_from_client": company_pnl_from_client,
             "spread_commission_revenue": spread_commission_revenue,
+            # New Phase 2 fields
+            "swap_revenue": swap_revenue,
+            "commission_revenue": commission_revenue,
+            "captured_client_losses": captured_client_losses,
+            "net_company_pnl": net_company_pnl,
+            "client_tenure_days": client_tenure_days,
+            "vip_status": vip_status,
+            "total_deposits_count": total_deposits_count,
+            "equity_30d_ago": equity_30d_ago,
+            "volume_90d_ago": volume_90d_ago,
+            "account_status": account_status,
         })
 
     return pd.DataFrame(records)
