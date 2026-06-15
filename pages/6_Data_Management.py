@@ -210,83 +210,166 @@ with tab_upload:
                 )
 
     else:
-        # Column guide
-        st.markdown(f"<h5 style='color:{GOLD}'>Expected Column Names</h5>",
-                    unsafe_allow_html=True)
-        st.markdown(f"<h5 style='color:{GOLD}'>Required Fields</h5>", unsafe_allow_html=True)
-        st.caption("These columns must be present. Missing required columns block dataset activation.")
-        required_data = {
+        # Column guide — BI Export Specification (v2.0)
+        st.markdown(
+            f"<h5 style='color:{GOLD}'>Upload Column Reference — BI Export Specification</h5>",
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Your upload file should include the columns below, organised by BI export section. "
+            "**Required** (✅) columns must be present; **Recommended** (Rec) columns "
+            "significantly improve scoring accuracy; optional (—) columns add filtering context."
+        )
+
+        def _col_table(data: dict) -> None:
+            st.dataframe(pd.DataFrame(data), hide_index=True, use_container_width=True)
+
+        # 1. Identity
+        st.markdown(f"<h6 style='color:{GOLD}'>1. Identity Fields</h6>", unsafe_allow_html=True)
+        _col_table({
             "Column Name": [
                 "client_id", "client_name", "country", "book_type",
-                "lifetime_deposits", "current_equity",
-                "last_login_date", "last_deposit_date", "trading_volume_30d",
+                "account_manager", "ib_name", "account_type",
             ],
+            "Required": ["✅", "✅", "✅", "✅", "—", "—", "—"],
             "Description": [
                 "Unique client identifier (string, e.g. CR10001)",
                 "Full client name",
                 "Country of residence",
                 "Book type: A-Book / B-Book / M-Book (controls profitability formula)",
-                "Total deposits since account opened ($)",
-                "Current account balance ($)",
-                "Date of last login (YYYY-MM-DD format)",
-                "Date of last deposit (YYYY-MM-DD format)",
-                "Trading volume in last 30 days ($)",
-            ],
-        }
-        st.dataframe(pd.DataFrame(required_data), hide_index=True, use_container_width=True)
-
-        st.markdown(f"<h5 style='color:{GOLD}'>Recommended Fields</h5>", unsafe_allow_html=True)
-        st.caption("These fields significantly improve scoring accuracy. Include if available.")
-        recommended_data = {
-            "Column Name": [
-                "net_deposits", "trading_volume_previous_30d", "last_withdrawal_date",
-                "withdrawals_30d", "commission_revenue", "spread_revenue",
-                "swap_revenue", "captured_client_losses", "complaints", "open_tickets",
-                "client_tenure_months",
-            ],
-            "Description": [
-                "Lifetime deposits minus total withdrawals ($) — used in equity erosion signal",
-                "Trading volume in prior 30-day period ($) — enables volume drop signal",
-                "Date of last withdrawal (YYYY-MM-DD) — enables withdrawal timing signal",
-                "Withdrawal amount in last 30 days ($) — strongest churn signal",
-                "Commission revenue from client ($/month)",
-                "Spread revenue from client ($/month) — used in A-Book profitability only",
-                "Swap revenue from client ($/month) — used in all book types",
-                "Captured client losses ($/month) — used in B-Book and M-Book profitability",
-                "Number of complaints in last 30 days",
-                "Number of open support tickets",
-                "Client tenure in months (converted to days internally)",
-            ],
-        }
-        st.dataframe(pd.DataFrame(recommended_data), hide_index=True, use_container_width=True)
-
-        st.markdown(f"<h5 style='color:{GOLD}'>Optional Fields</h5>", unsafe_allow_html=True)
-        st.caption("These add context and filtering capability but do not affect scoring.")
-        optional_data = {
-            "Column Name": [
-                "account_manager", "ib_name", "account_type", "company_pnl", "deposits_30d",
-            ],
-            "Description": [
-                "Assigned account manager name (enables AM-level filtering and reporting)",
-                "Introducing broker name (enables IB-level filtering)",
+                "Assigned account manager name (filtering and reporting only)",
+                "Introducing broker name (filtering and reporting only)",
                 "Account type: Classic / Prime / Islamic (informational only — not used in scoring)",
-                "Company PnL from this client ($ — alternative to individual revenue fields)",
-                "Deposit amount in last 30 days ($)",
             ],
-        }
-        st.dataframe(pd.DataFrame(optional_data), hide_index=True, use_container_width=True)
+        })
 
-        # Download template
-        all_cols = (required_data["Column Name"] + recommended_data["Column Name"] +
-                    optional_data["Column Name"])
+        # 2. Snapshot
+        st.markdown(f"<h6 style='color:{GOLD}'>2. Snapshot Fields</h6>", unsafe_allow_html=True)
+        _col_table({
+            "Column Name": ["lifetime_deposits", "current_equity", "equity_30d_ago", "net_deposits"],
+            "Required": ["✅", "✅", "Rec", "Rec"],
+            "Description": [
+                "Total deposits since account opened ($) — core value signal",
+                "Current account balance ($) — core value and risk signal",
+                "Equity 30 days ago ($) — enables equity trend signal",
+                "Lifetime deposits minus total withdrawals ($) — equity erosion signal",
+            ],
+        })
+
+        # 3. 30-day behavioural
+        st.markdown(
+            f"<h6 style='color:{GOLD}'>3. 30-Day Behavioural Fields</h6>",
+            unsafe_allow_html=True,
+        )
+        _col_table({
+            "Column Name": [
+                "last_login_date", "last_deposit_date", "trading_volume_30d",
+                "last_withdrawal_date", "withdrawals_30d", "complaints", "open_tickets",
+            ],
+            "Required": ["✅", "✅", "✅", "Rec", "Rec", "Rec", "Rec"],
+            "Description": [
+                "Date of last login (YYYY-MM-DD) — converted to login_days_ago internally",
+                "Date of last deposit (YYYY-MM-DD) — converted to last_deposit_days_ago internally",
+                "Trading volume in last 30 days ($) — primary activity signal",
+                "Date of last withdrawal (YYYY-MM-DD) — enables withdrawal timing signal",
+                "Withdrawal amount in last 30 days ($) — strongest churn signal (weight 12)",
+                "Number of complaints in last 30 days — risk signal (weight 5)",
+                "Number of open support tickets — risk signal",
+            ],
+        })
+
+        # 4. Previous 30-day comparison
+        st.markdown(
+            f"<h6 style='color:{GOLD}'>4. Previous 30-Day Comparison</h6>",
+            unsafe_allow_html=True,
+        )
+        _col_table({
+            "Column Name": ["trading_volume_previous_30d"],
+            "Required": ["Rec"],
+            "Description": [
+                "Trading volume in the prior 30-day period ($) — enables volume drop signal (weight 10)",
+            ],
+        })
+
+        # 5. 90-day trend
+        st.markdown(f"<h6 style='color:{GOLD}'>5. 90-Day Trend Fields</h6>", unsafe_allow_html=True)
+        _col_table({
+            "Column Name": ["volume_90d_ago"],
+            "Required": ["Rec"],
+            "Description": [
+                "Trading volume 90 days ago ($) — used in upside potential scoring",
+            ],
+        })
+
+        # 6. Lifetime fields
+        st.markdown(f"<h6 style='color:{GOLD}'>6. Lifetime Fields</h6>", unsafe_allow_html=True)
+        _col_table({
+            "Column Name": ["number_of_redeposits", "client_tenure_months"],
+            "Required": ["Rec", "Rec"],
+            "Description": [
+                "Total number of redeposits made (count) — value and reactivation signal",
+                "Client tenure in months — converted to client_tenure_days (×30) internally",
+            ],
+        })
+
+        # 7. Profitability fields
+        st.markdown(
+            f"<h6 style='color:{GOLD}'>7. Profitability Fields</h6>", unsafe_allow_html=True
+        )
+        _col_table({
+            "Column Name": [
+                "commission_revenue", "spread_revenue", "swap_revenue",
+                "captured_client_losses", "company_pnl",
+            ],
+            "Required": ["Rec", "Rec", "Rec", "Rec", "—"],
+            "Description": [
+                "Commission revenue from client ($/month) — all book types",
+                "Spread revenue from client ($/month) — A-Book profitability only",
+                "Swap revenue from client ($/month) — all book types",
+                "Captured client losses ($/month) — B-Book and M-Book profitability",
+                "Total company P&L from client ($) — alternative to individual revenue fields",
+            ],
+        })
+
+        # ── Download Template ──────────────────────────────────────────────────
+        # 27 columns matching the 7 BI export spec sections above
+        all_cols = [
+            # 1. Identity (7)
+            "client_id", "client_name", "country", "book_type",
+            "account_manager", "ib_name", "account_type",
+            # 2. Snapshot (4)
+            "lifetime_deposits", "current_equity", "equity_30d_ago", "net_deposits",
+            # 3. 30-day behavioural (7)
+            "last_login_date", "last_deposit_date", "trading_volume_30d",
+            "last_withdrawal_date", "withdrawals_30d", "complaints", "open_tickets",
+            # 4. Previous 30-day (1)
+            "trading_volume_previous_30d",
+            # 5. 90-day trend (1)
+            "volume_90d_ago",
+            # 6. Lifetime (2)
+            "number_of_redeposits", "client_tenure_months",
+            # 7. Profitability (5)
+            "commission_revenue", "spread_revenue", "swap_revenue",
+            "captured_client_losses", "company_pnl",
+        ]
         template_df = pd.DataFrame(columns=all_cols)
         template_df.loc[0] = [
+            # 1. Identity (7)
             "CR10001", "John Smith", "UAE", "B-Book",
-            "25000", "16500",
+            "Sarah Johnson", "Gulf Traders IB", "Prime",
+            # 2. Snapshot (4)
+            "25000", "16500", "17200", "18000",
+            # 3. 30-day behavioural (7)
             "2026-06-01", "2026-05-15", "120000",
-            "18000", "95000", "2026-04-20",
-            "2000", "24", "80", "0", "35", "500", "0", "1", "18",
-            "Sarah Johnson", "Gulf Traders IB", "Prime", "1200", "0",
+            "2026-04-20", "2000", "1", "0",
+            # 4. Previous 30-day (1)
+            "95000",
+            # 5. 90-day trend (1)
+            "85000",
+            # 6. Lifetime (2)
+            "5", "18",
+            # 7. Profitability (5)
+            "24", "80", "35", "500", "1200",
         ]
         buf = io.BytesIO()
         template_df.to_excel(buf, index=False, engine="openpyxl")
