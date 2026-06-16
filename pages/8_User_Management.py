@@ -4,6 +4,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timezone
+from typing import Optional
 
 st.set_page_config(
     page_title="User Management",
@@ -42,7 +43,7 @@ ALL_TEAM_MEMBERS = sorted(set(ACCOUNT_MANAGERS) | set(BUSINESS_DEVELOPERS))
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _fmt_date(iso: str | None) -> str:
+def _fmt_date(iso: Optional[str]) -> str:
     if not iso:
         return "—"
     try:
@@ -61,7 +62,7 @@ def _status_badge(status: str) -> str:
     return "🟢 Active" if status == "active" else "🔴 Inactive"
 
 
-def _validate_password_strength(pwd: str, confirm: str) -> str | None:
+def _validate_password_strength(pwd: str, confirm: str) -> Optional[str]:
     if len(pwd) < 8:
         return "Password must be at least 8 characters."
     if pwd != confirm:
