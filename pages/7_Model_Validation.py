@@ -14,10 +14,13 @@ from utils.helpers import (
     GOLD, RED, GREEN, AMBER, BLUE, PURPLE, MUTED,
 )
 from utils.session_init import init_session_state
+from utils.auth import require_login
+from utils.permissions import require_page_access
 
 apply_theme()
 init_session_state()
-
+user = require_login()
+require_page_access(user, "Model Validation")
 C = get_colors()
 
 page_header("📈 Model Validation", "Is the scoring model actually predictive?")

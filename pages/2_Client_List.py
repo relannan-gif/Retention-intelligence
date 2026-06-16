@@ -11,12 +11,18 @@ from utils.helpers import (
     get_plotly_layout,
 )
 from utils.session_init import init_session_state
+from utils.auth import require_login
+from utils.permissions import filter_data_for_user, no_data_warning
 
 apply_theme()
 init_session_state()
-page_header("👥 Client List", "All 300 clients · 6 scores · searchable and filterable")
+user = require_login()
+page_header("👥 Client List", "Your clients · 6 scores · searchable and filterable")
 
-df = load_data()
+df = filter_data_for_user(load_data(), user)
+if df.empty:
+    no_data_warning(user)
+    st.stop()
 t  = st.session_state["thresholds"]
 
 # ── Filters ───────────────────────────────────────────────────────────────────

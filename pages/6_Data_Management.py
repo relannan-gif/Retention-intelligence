@@ -17,9 +17,13 @@ from utils.helpers import (
     get_colors,
 )
 from utils.session_init import init_session_state
+from utils.auth import require_login
+from utils.permissions import require_page_access
 
 apply_theme()
 init_session_state()
+user = require_login()
+require_page_access(user, "Data Management")
 C = get_colors()
 page_header(
     "📂 Data Management",

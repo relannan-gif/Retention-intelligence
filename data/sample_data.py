@@ -39,6 +39,46 @@ IB_NAMES = [
 ACCOUNT_TYPES = ["Classic", "Prime", "Islamic"]
 BOOK_TYPES = ["A-Book", "B-Book", "M-Book"]
 
+REGIONS = ["GCC", "MENA", "Africa", "Europe", "South Asia", "SE Asia"]
+
+COUNTRY_TO_REGION = {
+    "UAE": "GCC", "Saudi Arabia": "GCC", "Kuwait": "GCC",
+    "Qatar": "GCC", "Bahrain": "GCC",
+    "Egypt": "MENA", "Jordan": "MENA", "Lebanon": "MENA",
+    "Iraq": "MENA", "Morocco": "MENA",
+    "Nigeria": "Africa", "Kenya": "Africa", "South Africa": "Africa",
+    "Ghana": "Africa", "Tanzania": "Africa",
+    "UK": "Europe", "Germany": "Europe", "France": "Europe",
+    "Spain": "Europe", "Italy": "Europe",
+    "India": "South Asia", "Pakistan": "South Asia", "Bangladesh": "South Asia",
+    "Sri Lanka": "South Asia", "Nepal": "South Asia",
+    "Malaysia": "SE Asia", "Indonesia": "SE Asia", "Thailand": "SE Asia",
+    "Philippines": "SE Asia", "Vietnam": "SE Asia",
+}
+
+REGIONAL_MANAGERS = {
+    "GCC":        "Omar Al-Mansouri",
+    "MENA":       "Nadia Hassan",
+    "Africa":     "Emmanuel Okafor",
+    "Europe":     "Sophie Laurent",
+    "South Asia": "Rajesh Kumar",
+    "SE Asia":    "Lin Wei",
+}
+
+SALES_DIRECTORS = {
+    "GCC":        "Michael Thompson",
+    "MENA":       "Michael Thompson",
+    "Africa":     "Rebecca Osei",
+    "Europe":     "Rebecca Osei",
+    "South Asia": "Chen Xiaoming",
+    "SE Asia":    "Chen Xiaoming",
+}
+
+BUSINESS_DEVELOPERS = [
+    "Alex Turner", "Layla Al-Farsi", "Marco Rossi", "Zara Ahmed",
+    "Tom Bradley", "Mia Kowalski", "Hassan Malik", "Ingrid Svensson",
+]
+
 
 def generate_clients(n: int = 300) -> pd.DataFrame:
     """
@@ -52,7 +92,12 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
         client_id = f"CR{10000 + i}"
         client_name = fake.name()
         country = np.random.choice(COUNTRIES, p=None)
+        region = COUNTRY_TO_REGION[country]
+        regional_manager = REGIONAL_MANAGERS[region]
+        sales_director = SALES_DIRECTORS[region]
         account_manager = np.random.choice(ACCOUNT_MANAGERS)
+        business_developer = np.random.choice(BUSINESS_DEVELOPERS)
+        sales_owner = account_manager  # AM is the primary relationship owner
         ib_name = np.random.choice(IB_NAMES)
         account_type = np.random.choice(ACCOUNT_TYPES)
         book_type = np.random.choice(BOOK_TYPES, p=[0.3, 0.5, 0.2])
@@ -205,11 +250,16 @@ def generate_clients(n: int = 300) -> pd.DataFrame:
             account_status = "Inactive"
 
         records.append({
-            # Original fields
+            # Identity
             "client_id": client_id,
             "client_name": client_name,
             "country": country,
+            "region": region,
+            "regional_manager": regional_manager,
+            "sales_director": sales_director,
             "account_manager": account_manager,
+            "business_developer": business_developer,
+            "sales_owner": sales_owner,
             "ib_name": ib_name,
             "account_type": account_type,
             "book_type": book_type,

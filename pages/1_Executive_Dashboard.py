@@ -14,14 +14,20 @@ from utils.helpers import (
 )
 from utils.scoring import generate_trend_snapshots
 from utils.session_init import init_session_state
+from utils.auth import require_login
+from utils.permissions import filter_data_for_user, no_data_warning
 
 apply_theme()
 init_session_state()
+user = require_login()
 C = get_colors()
 page_header("📈 Executive Dashboard",
             "Board-level retention intelligence · A-Book · B-Book · M-Book")
 
-df = load_data()
+df = filter_data_for_user(load_data(), user)
+if df.empty:
+    no_data_warning(user)
+    st.stop()
 t  = st.session_state["thresholds"]
 hr = t["high_risk"];  hv = t["high_value"];  cp = t["critical_priority"]
 

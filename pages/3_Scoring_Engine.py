@@ -14,13 +14,20 @@ from utils.helpers import (
     get_plotly_layout,
 )
 from utils.session_init import init_session_state
+from utils.auth import require_login
+from utils.permissions import filter_data_for_user, no_data_warning
 
 apply_theme()
 init_session_state()
+user = require_login()
 page_header("⚙️ Scoring Engine",
             "Six book-aware scores · adjust weights · live scatter analysis")
 
-df = load_data()
+df = filter_data_for_user(load_data(), user)
+if df.empty:
+    no_data_warning(user)
+    st.stop()
+_can_edit_weights = (user.get("level", 3) == 1)
 t  = st.session_state["thresholds"]
 
 # ── Score explainer ───────────────────────────────────────────────────────────
@@ -173,18 +180,20 @@ with tab_risk:
         "Weights are proportional — only the ratio between them matters, not the absolute values."
     )
     rw = st.session_state["risk_weights"].copy()
+    if not _can_edit_weights:
+        st.info("🔒 Weight adjustment is available to administrators only. Showing current weights.")
     c1, c2 = st.columns(2)
     with c1:
-        rw["w_withdrawal"]     = st.slider("Withdrawal pressure (strongest churn signal)",    0, 15, rw["w_withdrawal"])
-        rw["w_volume_drop"]    = st.slider("Volume drop (early warning — precedes withdrawal)",0, 15, rw["w_volume_drop"])
-        rw["w_login"]          = st.slider("Login inactivity (platform disengagement)",       0, 15, rw["w_login"])
-        rw["w_equity_trend"]   = st.slider("Equity declining 30-day (short-term capital flight)", 0, 15, rw["w_equity_trend"])
+        rw["w_withdrawal"]     = st.slider("Withdrawal pressure (strongest churn signal)",    0, 15, rw["w_withdrawal"], disabled=not _can_edit_weights)
+        rw["w_volume_drop"]    = st.slider("Volume drop (early warning — precedes withdrawal)",0, 15, rw["w_volume_drop"], disabled=not _can_edit_weights)
+        rw["w_login"]          = st.slider("Login inactivity (platform disengagement)",       0, 15, rw["w_login"], disabled=not _can_edit_weights)
+        rw["w_equity_trend"]   = st.slider("Equity declining 30-day (short-term capital flight)", 0, 15, rw["w_equity_trend"], disabled=not _can_edit_weights)
     with c2:
-        rw["w_deposit_stale"]  = st.slider("Deposit inactivity (no top-up signal)",          0, 15, rw["w_deposit_stale"])
-        rw["w_complaints"]     = st.slider("Complaints + tickets (service dissatisfaction)", 0, 15, rw["w_complaints"])
-        rw["w_equity_erosion"] = st.slider("Equity erosion vs net deposits (long-term P&L destruction)", 0, 15, rw["w_equity_erosion"])
+        rw["w_deposit_stale"]  = st.slider("Deposit inactivity (no top-up signal)",          0, 15, rw["w_deposit_stale"], disabled=not _can_edit_weights)
+        rw["w_complaints"]     = st.slider("Complaints + tickets (service dissatisfaction)", 0, 15, rw["w_complaints"], disabled=not _can_edit_weights)
+        rw["w_equity_erosion"] = st.slider("Equity erosion vs net deposits (long-term P&L destruction)", 0, 15, rw["w_equity_erosion"], disabled=not _can_edit_weights)
 
-    if st.button("Apply Risk Weights", type="primary", key="apply_risk"):
+    if _can_edit_weights and st.button("Apply Risk Weights", type="primary", key="apply_risk"):
         st.session_state["risk_weights"] = rw
         rescore()
         st.success("Risk weights updated — all scores recalculated.")
@@ -201,15 +210,15 @@ with tab_val:
     vw = st.session_state["value_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        vw["v_lifetime_dep"]   = st.slider("Lifetime deposits (total relationship size)",  0, 15, vw["v_lifetime_dep"])
-        vw["v_net_dep"]        = st.slider("Net deposits (committed capital)",             0, 15, vw["v_net_dep"])
-        vw["v_current_equity"] = st.slider("Current equity (capital at risk if churns)",  0, 15, vw["v_current_equity"])
+        vw["v_lifetime_dep"]   = st.slider("Lifetime deposits (total relationship size)",  0, 15, vw["v_lifetime_dep"], disabled=not _can_edit_weights)
+        vw["v_net_dep"]        = st.slider("Net deposits (committed capital)",             0, 15, vw["v_net_dep"], disabled=not _can_edit_weights)
+        vw["v_current_equity"] = st.slider("Current equity (capital at risk if churns)",  0, 15, vw["v_current_equity"], disabled=not _can_edit_weights)
     with c2:
-        vw["v_volume"]         = st.slider("Trading volume 30d (active revenue generator)", 0, 15, vw["v_volume"])
-        vw["v_redeposits"]     = st.slider("Redeposit count (loyalty indicator)",          0, 15, vw["v_redeposits"])
-        vw["v_tenure"]         = st.slider("Client tenure (long-term commitment)",         0, 15, vw["v_tenure"])
+        vw["v_volume"]         = st.slider("Trading volume 30d (active revenue generator)", 0, 15, vw["v_volume"], disabled=not _can_edit_weights)
+        vw["v_redeposits"]     = st.slider("Redeposit count (loyalty indicator)",          0, 15, vw["v_redeposits"], disabled=not _can_edit_weights)
+        vw["v_tenure"]         = st.slider("Client tenure (long-term commitment)",         0, 15, vw["v_tenure"], disabled=not _can_edit_weights)
 
-    if st.button("Apply Value Weights", type="primary", key="apply_val"):
+    if _can_edit_weights and st.button("Apply Value Weights", type="primary", key="apply_val"):
         st.session_state["value_weights"] = vw
         rescore()
         st.success("Value weights updated.")
@@ -226,14 +235,14 @@ with tab_react:
     rw2 = st.session_state["react_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        rw2["r_login_window"]  = st.slider("Login recency window (30–180d)", 0, 10, rw2["r_login_window"])
-        rw2["r_lifetime_dep"]  = st.slider("Historical deposits",            0, 10, rw2["r_lifetime_dep"])
-        rw2["r_volume_hist"]   = st.slider("Historical volume (90d)",        0, 10, rw2["r_volume_hist"])
+        rw2["r_login_window"]  = st.slider("Login recency window (30–180d)", 0, 10, rw2["r_login_window"], disabled=not _can_edit_weights)
+        rw2["r_lifetime_dep"]  = st.slider("Historical deposits",            0, 10, rw2["r_lifetime_dep"], disabled=not _can_edit_weights)
+        rw2["r_volume_hist"]   = st.slider("Historical volume (90d)",        0, 10, rw2["r_volume_hist"], disabled=not _can_edit_weights)
     with c2:
-        rw2["r_redeposits"]    = st.slider("Past redeposit loyalty",         0, 10, rw2["r_redeposits"])
-        rw2["r_tenure"]        = st.slider("Client tenure",                  0, 10, rw2["r_tenure"])
+        rw2["r_redeposits"]    = st.slider("Past redeposit loyalty",         0, 10, rw2["r_redeposits"], disabled=not _can_edit_weights)
+        rw2["r_tenure"]        = st.slider("Client tenure",                  0, 10, rw2["r_tenure"], disabled=not _can_edit_weights)
 
-    if st.button("Apply Reactivation Weights", type="primary", key="apply_react"):
+    if _can_edit_weights and st.button("Apply Reactivation Weights", type="primary", key="apply_react"):
         st.session_state["react_weights"] = rw2
         rescore()
         st.success("Reactivation weights updated.")
@@ -250,14 +259,14 @@ with tab_upside:
     uw = st.session_state["upside_weights"].copy()
     c1, c2 = st.columns(2)
     with c1:
-        uw["u_equity"]       = st.slider("Current equity size (capital base)", 0, 15, uw["u_equity"])
-        uw["u_net_dep"]      = st.slider("Net deposits (committed capital)",   0, 15, uw["u_net_dep"])
-        uw["u_volume_trend"] = st.slider("Positive volume trend (growing trader)", 0, 15, uw["u_volume_trend"])
+        uw["u_equity"]       = st.slider("Current equity size (capital base)", 0, 15, uw["u_equity"], disabled=not _can_edit_weights)
+        uw["u_net_dep"]      = st.slider("Net deposits (committed capital)",   0, 15, uw["u_net_dep"], disabled=not _can_edit_weights)
+        uw["u_volume_trend"] = st.slider("Positive volume trend (growing trader)", 0, 15, uw["u_volume_trend"], disabled=not _can_edit_weights)
     with c2:
-        uw["u_redeposits"]   = st.slider("Redeposit loyalty (repeat depositor)", 0, 15, uw["u_redeposits"])
-        uw["u_tenure"]       = st.slider("Client tenure (long-term relationship)", 0, 15, uw["u_tenure"])
+        uw["u_redeposits"]   = st.slider("Redeposit loyalty (repeat depositor)", 0, 15, uw["u_redeposits"], disabled=not _can_edit_weights)
+        uw["u_tenure"]       = st.slider("Client tenure (long-term relationship)", 0, 15, uw["u_tenure"], disabled=not _can_edit_weights)
 
-    if st.button("Apply Upside Potential Weights", type="primary", key="apply_upside"):
+    if _can_edit_weights and st.button("Apply Upside Potential Weights", type="primary", key="apply_upside"):
         st.session_state["upside_weights"] = uw
         rescore()
         st.success("Upside Potential weights updated.")
