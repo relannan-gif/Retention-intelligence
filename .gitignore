@@ -8,3 +8,4 @@ venv/
 .DS_Store
 .claude/
 data/snapshots.db
+data/users.db
